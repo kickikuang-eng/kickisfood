@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ChefHat } from "lucide-react";
+import { Citrus } from "lucide-react";
 
 export const Header = () => {
   return (
@@ -9,10 +9,10 @@ export const Header = () => {
           {/* Logo */}
           <div className="flex items-center gap-3">
             <div className="p-2 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg">
-              <ChefHat className="w-6 h-6 text-white" />
+              <Citrus className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-foreground">RecipeVault</h1>
+              <h1 className="text-xl font-bold text-foreground">Kickisfood</h1>
             </div>
           </div>
 
