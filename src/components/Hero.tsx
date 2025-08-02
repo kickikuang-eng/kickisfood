@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Download, Smartphone } from "lucide-react";
+import { Plus } from "lucide-react";
 
 export const Hero = () => {
   return (
@@ -21,28 +21,17 @@ export const Hero = () => {
               <p className="text-xl text-gray-600 max-w-xl leading-relaxed">
                 Find, import, and organize your recipes from Instagram, Facebook, 
                 TikTok and YouTube. Save recipes from handwritten notes, cookbooks, 
-                or your favorite recipe websites. Get cooking with RecipeVault for free!
+                or your favorite recipe websites. Get cooking for free!
               </p>
             </div>
 
-            {/* App Store Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button className="bg-black hover:bg-gray-800 text-white px-6 py-3 rounded-lg flex items-center gap-3 text-base font-medium">
-                <Download className="w-5 h-5" />
-                Download on the App Store
-              </Button>
-              
-              <Button className="bg-black hover:bg-gray-800 text-white px-6 py-3 rounded-lg flex items-center gap-3 text-base font-medium">
-                <Smartphone className="w-5 h-5" />
-                Get it on Google Play
+            {/* Add Recipe Button */}
+            <div className="flex justify-center">
+              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-lg text-lg font-medium flex items-center gap-3">
+                <Plus className="w-6 h-6" />
+                Add Your First Recipe
               </Button>
             </div>
-
-            <div className="text-center text-gray-500 font-medium">OR</div>
-
-            <Button className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-lg text-lg font-medium">
-              Try it on the web
-            </Button>
           </div>
 
           {/* Right Content - App Preview */}
