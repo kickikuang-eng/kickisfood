@@ -1,44 +1,36 @@
+import { Citrus, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Citrus } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
 
 export const Header = () => {
+  const location = useLocation();
+
   return (
     <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
       <div className="max-w-7xl mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center gap-3">
+          <Link to="/" className="flex items-center gap-3">
             <div>
               <Citrus className="w-8 h-8 text-yellow-500" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-foreground">Kickisfood</h1>
+              <p className="text-sm text-muted-foreground">Recipe Manager</p>
             </div>
-          </div>
+          </Link>
 
           {/* Navigation */}
-          <nav className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-foreground hover:text-emerald-600 transition-colors">
-              Features
-            </a>
-            <a href="#pricing" className="text-foreground hover:text-emerald-600 transition-colors">
-              Pricing
-            </a>
-            <a href="#faq" className="text-foreground hover:text-emerald-600 transition-colors">
-              FAQ
-            </a>
-            <a href="#blog" className="text-foreground hover:text-emerald-600 transition-colors">
-              Blog
-            </a>
-          </nav>
-
-          {/* Sign Up Button */}
-          <div className="flex items-center gap-3">
-            <Button 
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-full font-medium"
-            >
-              Sign up free
-            </Button>
+          <div className="flex items-center gap-4">
+            <Link to="/library">
+              <Button 
+                variant={location.pathname === '/library' ? 'default' : 'ghost'}
+                className="flex items-center gap-2"
+              >
+                <BookOpen className="w-4 h-4" />
+                My Library
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
