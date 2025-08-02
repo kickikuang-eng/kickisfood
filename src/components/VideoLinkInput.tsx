@@ -87,7 +87,7 @@ export const VideoLinkInput = () => {
           {/* Social Media Icons */}
           <div className="flex justify-center gap-4 mb-8">
             <div className="w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 rounded-lg flex items-center justify-center">
-              <span className="text-white text-xs">📷</span>
+              <span className="text-white text-xs font-semibold">IG</span>
             </div>
             <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
               <span className="text-white text-xs">f</span>
