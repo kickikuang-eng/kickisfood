@@ -52,7 +52,16 @@ export const VideoLinkInput = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background">
+      {/* Header with Logo */}
+      <header className="w-full p-6 border-b border-border">
+        <div className="max-w-6xl mx-auto">
+          <h1 className="text-2xl font-bold text-foreground">Kickisfood</h1>
+        </div>
+      </header>
+      
+      {/* Main Content */}
+      <div className="flex items-center justify-center p-4 pt-12">
       <div className="w-full max-w-2xl">
         {/* Progress Bar */}
         <div className="mb-8 p-4 rounded-lg border bg-card">
@@ -132,6 +141,7 @@ export const VideoLinkInput = () => {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
