@@ -8,8 +8,8 @@ export const Header = () => {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg">
-              <Citrus className="w-6 h-6 text-white" />
+            <div>
+              <Citrus className="w-8 h-8 text-yellow-500" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-foreground">Kickisfood</h1>
