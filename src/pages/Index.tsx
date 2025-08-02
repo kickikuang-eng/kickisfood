@@ -1,15 +1,7 @@
-import { Header } from "@/components/Header";
-import { Hero } from "@/components/Hero";
-import { RecipeGrid } from "@/components/RecipeGrid";
+import { VideoLinkInput } from "@/components/VideoLinkInput";
 
 const Index = () => {
-  return (
-    <div className="min-h-screen bg-gradient-subtle">
-      <Header />
-      <Hero />
-      <RecipeGrid />
-    </div>
-  );
+  return <VideoLinkInput />;
 };
 
 export default Index;
