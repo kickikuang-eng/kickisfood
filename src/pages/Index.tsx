@@ -1,7 +1,13 @@
-import { VideoLinkInput } from "@/components/VideoLinkInput";
+import { Hero } from "@/components/Hero";
+import { Header } from "@/components/Header";
 
 const Index = () => {
-  return <VideoLinkInput />;
+  return (
+    <div className="min-h-screen bg-background">
+      <Header />
+      <Hero />
+    </div>
+  );
 };
 
 export default Index;
