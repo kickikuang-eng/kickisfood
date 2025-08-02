@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import { AddRecipeDialog } from "@/components/AddRecipeDialog";
 
 export const Hero = () => {
   return (
@@ -27,10 +28,12 @@ export const Hero = () => {
 
             {/* Add Recipe Button */}
             <div className="flex justify-center">
-              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-lg text-lg font-medium flex items-center gap-3">
-                <Plus className="w-6 h-6" />
-                Add Your First Recipe
-              </Button>
+              <AddRecipeDialog>
+                <Button className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-lg text-lg font-medium flex items-center gap-3">
+                  <Plus className="w-6 h-6" />
+                  Add Your First Recipe
+                </Button>
+              </AddRecipeDialog>
             </div>
           </div>
 
