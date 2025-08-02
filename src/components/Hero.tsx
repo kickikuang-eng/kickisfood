@@ -1,8 +1,47 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { Plus, Link, Loader2 } from "lucide-react";
 import { AddRecipeDialog } from "@/components/AddRecipeDialog";
 
 export const Hero = () => {
+  const [url, setUrl] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+
+  const handleConvertRecipe = async () => {
+    if (!url.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid URL",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // TODO: Implement recipe scraping functionality
+      toast({
+        title: "Coming Soon",
+        description: "Recipe scraping will be implemented soon!",
+      });
+      
+      // Reset form after delay
+      setTimeout(() => {
+        setUrl("");
+        setIsLoading(false);
+      }, 1000);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to scrape recipe from URL",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    }
+  };
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-white to-gray-50">
       <div className="max-w-7xl mx-auto px-6 py-20">
@@ -26,12 +65,50 @@ export const Hero = () => {
               </p>
             </div>
 
+            
+            {/* URL Input Section */}
+            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+              <div className="flex items-center gap-3 mb-4">
+                <Link className="w-5 h-5 text-emerald-600" />
+                <h3 className="text-lg font-semibold text-gray-900">Add Recipe from URL</h3>
+              </div>
+              <p className="text-gray-600 mb-4">
+                Paste any recipe URL and we'll extract the ingredients and instructions for you.
+              </p>
+              <div className="flex gap-3">
+                <Input
+                  placeholder="https://example.com/recipe"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  type="url"
+                  className="flex-1"
+                />
+                <Button
+                  onClick={handleConvertRecipe}
+                  disabled={isLoading || !url.trim()}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Converting...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      Convert
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
             {/* Add Recipe Button */}
             <div className="flex justify-center">
               <AddRecipeDialog>
-                <Button className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-lg text-lg font-medium flex items-center gap-3">
+                <Button variant="outline" className="px-8 py-4 rounded-lg text-lg font-medium flex items-center gap-3">
                   <Plus className="w-6 h-6" />
-                  Add Your First Recipe
+                  Or Add Recipe Manually
                 </Button>
               </AddRecipeDialog>
             </div>
