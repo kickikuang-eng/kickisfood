@@ -37,12 +37,12 @@ All colors MUST be HSL.
     --ring: 25 95% 53%;
 
     /* Recipe app specific colors */
-    --warm-orange: 25 95% 53%;
-    --warm-red: 15 85% 60%;
+    --warm-orange: 120 85% 45%;
+    --warm-red: 135 75% 40%;
     --cream: 30 30% 98%;
     --warm-brown: 25 20% 15%;
     --light-cream: 30 20% 95%;
-    --soft-peach: 20 60% 85%;
+    --soft-peach: 120 50% 85%;
 
     /* Gradients */
     --gradient-warm: linear-gradient(135deg, hsl(var(--warm-orange)), hsl(var(--warm-red)));
@@ -107,12 +107,12 @@ All colors MUST be HSL.
     --ring: 25 95% 53%;
 
     /* Dark mode specific */
-    --warm-orange: 25 95% 53%;
-    --warm-red: 15 85% 60%;
+    --warm-orange: 120 85% 45%;
+    --warm-red: 135 75% 40%;
     --cream: 25 25% 8%;
     --warm-brown: 30 30% 95%;
     --light-cream: 25 15% 18%;
-    --soft-peach: 20 40% 25%;
+    --soft-peach: 120 40% 25%;
 
     --gradient-warm: linear-gradient(135deg, hsl(var(--warm-orange)), hsl(var(--warm-red)));
     --gradient-subtle: linear-gradient(180deg, hsl(var(--cream)), hsl(var(--light-cream)));
