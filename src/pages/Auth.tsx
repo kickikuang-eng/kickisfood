@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { ChefHat, Mail, Phone, Apple } from "lucide-react";
+import { Citrus, Mail, Phone, Apple } from "lucide-react";
 
 const Auth = () => {
   const [isSignIn, setIsSignIn] = useState(true);
@@ -100,9 +100,14 @@ const Auth = () => {
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
-      <div className="flex items-center gap-2 p-6">
-        <ChefHat className="w-6 h-6" />
-        <span className="font-semibold text-lg">Recipe Book</span>
+      <div className="flex items-center gap-3 p-6">
+        <div>
+          <Citrus className="w-8 h-8 text-yellow-500" />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-foreground">Kickisfood</h1>
+          <p className="text-sm text-muted-foreground">Recipe Manager</p>
+        </div>
       </div>
 
       {/* Main Content */}
