@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Link2, Sparkles, Mic } from "lucide-react";
+import { Plus, Link2, ArrowRight, Mic } from "lucide-react";
 import { AddRecipeDialog } from "@/components/AddRecipeDialog";
 
 export const Hero = () => {
@@ -122,7 +122,7 @@ export const Hero = () => {
                 {isLoading ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
-                  <Sparkles className="w-4 h-4" />
+                  <ArrowRight className="w-4 h-4" />
                 )}
               </Button>
             </div>
