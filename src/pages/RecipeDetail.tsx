@@ -61,12 +61,23 @@ const RecipeDetail = () => {
         .from('recipes')
         .select('*')
         .eq('id', recipeId)
-        .single();
+        .maybeSingle();
 
       if (error) {
+        console.error('Error fetching recipe:', error);
         toast({
           title: "Error",
           description: "Failed to fetch recipe",
+          variant: "destructive",
+        });
+        navigate("/library");
+        return;
+      }
+
+      if (!data) {
+        toast({
+          title: "Recipe not found",
+          description: "The recipe you're looking for doesn't exist or has been deleted",
           variant: "destructive",
         });
         navigate("/library");

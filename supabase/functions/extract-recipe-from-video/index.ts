@@ -124,17 +124,22 @@ function getVideoThumbnail(videoInfo: { platform: string; id: string }): string 
     case 'youtube':
       return `https://img.youtube.com/vi/${videoInfo.id}/maxresdefault.jpg`;
     case 'tiktok':
+      // Try to get TikTok thumbnail - this may not always work due to TikTok's restrictions
+      return `https://www.tiktok.com/oembed?url=https://www.tiktok.com/@user/video/${videoInfo.id}`;
     case 'instagram':
-      // For platforms where we can't get actual thumbnails, use a real sample recipe image
-      // This is a food image that OpenAI can analyze to demonstrate the recipe extraction
-      return `https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=1024&h=1024&fit=crop&crop=center`;
+      // For Instagram, we'll try a different approach using their oEmbed endpoint
+      return `https://graph.instagram.com/oembed?url=https://www.instagram.com/p/${videoInfo.id}/&access_token=instagram_basic_display`;
     default:
       return `https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=1024&h=1024&fit=crop&crop=center`;
   }
 }
 
 async function analyzeVideoForRecipe(imageUrl: string, videoUrl: string) {
-  const prompt = `Analyze this image from a cooking video and extract a complete recipe. Please provide:
+  // For Instagram and TikTok, we need to inform the AI that we can't access the actual image
+  const isActualImage = imageUrl.includes('img.youtube.com');
+  
+  const prompt = isActualImage 
+    ? `Analyze this image from a cooking video and extract a complete recipe. Please provide:
 
 1. Recipe title (creative and descriptive)
 2. Brief description
@@ -157,7 +162,49 @@ Please format the response as JSON with these exact keys:
 - difficulty (string: "Easy", "Medium", or "Hard")
 - cuisine (string or null)
 
-Be creative and detailed. If some information isn't visible, make reasonable assumptions based on what you can see.`;
+Be creative and detailed. If some information isn't visible, make reasonable assumptions based on what you can see.`
+    : `I cannot access the actual thumbnail from this ${videoUrl.includes('instagram') ? 'Instagram' : 'TikTok'} video due to platform restrictions. 
+
+Please generate a placeholder recipe that indicates this limitation. Create a recipe with the title "Recipe from ${videoUrl.includes('instagram') ? 'Instagram' : 'TikTok'} Video - Manual Review Needed" and include a note in the description explaining that the actual video content couldn't be analyzed.
+
+Format the response as JSON with these exact keys:
+- title (string)
+- description (string)
+- ingredients (array of strings)
+- instructions (array of strings)
+- prep_time (number in minutes)
+- cook_time (number in minutes)
+- servings (number)
+- difficulty (string: "Easy", "Medium", or "Hard")
+- cuisine (string or null)
+
+Make it clear that this is a placeholder and the user should manually review and edit the recipe.`;
+
+  // For non-image URLs (Instagram/TikTok), make a text-only request
+  const requestBody = isActualImage ? {
+    model: 'gpt-4o',
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          { type: 'image_url', image_url: { url: imageUrl } }
+        ]
+      }
+    ],
+    max_tokens: 1500,
+    temperature: 0.7,
+  } : {
+    model: 'gpt-4o',
+    messages: [
+      {
+        role: 'user',
+        content: prompt
+      }
+    ],
+    max_tokens: 1500,
+    temperature: 0.7,
+  };
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -165,20 +212,7 @@ Be creative and detailed. If some information isn't visible, make reasonable ass
       'Authorization': `Bearer ${openAIApiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: prompt },
-            { type: 'image_url', image_url: { url: imageUrl } }
-          ]
-        }
-      ],
-      max_tokens: 1500,
-      temperature: 0.7,
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
