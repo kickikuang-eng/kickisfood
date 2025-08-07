@@ -174,7 +174,11 @@ const RecipeLibrary = () => {
         {!isLoading && filteredRecipes.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredRecipes.map((recipe) => (
-              <Card key={recipe.id} className="group hover:shadow-lg transition-shadow cursor-pointer">
+              <Card 
+                key={recipe.id} 
+                className="group hover:shadow-lg transition-shadow cursor-pointer"
+                onClick={() => navigate(`/recipe/${recipe.id}`)}
+              >
                 <CardHeader>
                   <CardTitle className="line-clamp-2">{recipe.title}</CardTitle>
                   {recipe.description && (
