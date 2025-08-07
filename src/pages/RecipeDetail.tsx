@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
+import { ImageUploadInput } from "@/components/ImageUploadInput";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -373,12 +374,14 @@ const RecipeDetail = () => {
             {(recipe.image_url || isEditing) && (
               <div className="mt-6">
                 {isEditing ? (
-                  <Input
-                    value={editForm.image_url || ''}
-                    onChange={(e) => setEditForm({ ...editForm, image_url: e.target.value })}
-                    placeholder="Image URL"
-                    className="mb-4"
-                  />
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Recipe Image</label>
+                    <ImageUploadInput
+                      value={editForm.image_url || ''}
+                      onChange={(url) => setEditForm({ ...editForm, image_url: url })}
+                      placeholder="Enter image URL or upload from computer"
+                    />
+                  </div>
                 ) : null}
                 {(recipe.image_url || editForm.image_url) && (
                   <div className="aspect-video rounded-lg overflow-hidden bg-muted">
