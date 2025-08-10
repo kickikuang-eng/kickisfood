@@ -8,11 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Search, Clock, Users } from "lucide-react";
+import { Plus, Search, Clock, Users, ChefHat, ChevronsUpDown } from "lucide-react";
 import { AddRecipeDialog } from "@/components/AddRecipeDialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 
 
 interface Recipe {
@@ -29,6 +31,7 @@ interface Recipe {
   image_url: string | null;
   source_url: string | null;
   created_at: string;
+  chef: string | null;
 }
 
 const RecipeLibrary = () => {
@@ -39,12 +42,16 @@ const RecipeLibrary = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
-  const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
+const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
   const [cuisineFilter, setCuisineFilter] = useState<string>("all");
   const [maxTime, setMaxTime] = useState<number | null>(null);
+  const [chefFilter, setChefFilter] = useState<string>("");
+  const [chefOpen, setChefOpen] = useState(false);
+  const [chefQuery, setChefQuery] = useState("");
 
   const difficulties = Array.from(new Set(recipes.map(r => r.difficulty).filter(Boolean))) as string[];
   const cuisines = Array.from(new Set(recipes.map(r => r.cuisine).filter(Boolean))) as string[];
+  const chefs = Array.from(new Set(recipes.map(r => r.chef).filter(Boolean))) as string[];
 
   useEffect(() => {
     if (!loading && !user) {
@@ -90,7 +97,8 @@ const filteredRecipes = recipes.filter((recipe) => {
   const matchesSearch =
     recipe.title.toLowerCase().includes(query) ||
     (recipe.description?.toLowerCase().includes(query) ?? false) ||
-    (recipe.cuisine?.toLowerCase().includes(query) ?? false);
+    (recipe.cuisine?.toLowerCase().includes(query) ?? false) ||
+    (recipe.chef?.toLowerCase().includes(query) ?? false);
 
   const matchesDifficulty =
     difficultyFilter === "all" ||
@@ -100,10 +108,14 @@ const filteredRecipes = recipes.filter((recipe) => {
     cuisineFilter === "all" ||
     (recipe.cuisine?.toLowerCase() === cuisineFilter.toLowerCase());
 
+  const matchesChef =
+    !chefFilter ||
+    (recipe.chef?.toLowerCase().includes(chefFilter.toLowerCase()) ?? false);
+
   const totalTime = (recipe.prep_time || 0) + (recipe.cook_time || 0);
   const matchesTime = maxTime == null || totalTime <= maxTime;
 
-  return matchesSearch && matchesDifficulty && matchesCuisine && matchesTime;
+  return matchesSearch && matchesDifficulty && matchesCuisine && matchesChef && matchesTime;
 });
 
   const formatTime = (minutes: number | null) => {
@@ -146,7 +158,7 @@ const filteredRecipes = recipes.filter((recipe) => {
     />
   </div>
 
-  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+<div className="grid grid-cols-1 md:grid-cols-5 gap-4">
     <div className="flex flex-col gap-2">
       <Label htmlFor="difficulty">Difficulty</Label>
       <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
@@ -178,6 +190,59 @@ const filteredRecipes = recipes.filter((recipe) => {
     </div>
 
     <div className="flex flex-col gap-2">
+      <Label htmlFor="chef">Chef</Label>
+      <Popover open={chefOpen} onOpenChange={setChefOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="outline" role="combobox" aria-expanded={chefOpen} className="justify-between">
+            {chefFilter ? chefFilter : "All"}
+            <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[240px] p-0 z-50 bg-background">
+          <Command>
+            <CommandInput
+              placeholder="Type a chef..."
+              value={chefQuery}
+              onValueChange={setChefQuery}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setChefFilter(chefQuery);
+                  setChefOpen(false);
+                }
+              }}
+            />
+            <CommandEmpty>No chefs found.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="all"
+                onSelect={() => {
+                  setChefFilter("");
+                  setChefQuery("");
+                  setChefOpen(false);
+                }}
+              >
+                All
+              </CommandItem>
+              {chefs.map((c) => (
+                <CommandItem
+                  key={c}
+                  value={c}
+                  onSelect={(val) => {
+                    setChefFilter(val);
+                    setChefQuery(val);
+                    setChefOpen(false);
+                  }}
+                >
+                  {c}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
+
+    <div className="flex flex-col gap-2">
       <Label htmlFor="maxtime">Max total time ({maxTime ?? "∞"} min)</Label>
       <Slider
         id="maxtime"
@@ -191,7 +256,7 @@ const filteredRecipes = recipes.filter((recipe) => {
     </div>
 
     <div className="flex items-end">
-      <Button variant="outline" onClick={() => { setDifficultyFilter("all"); setCuisineFilter("all"); setMaxTime(null); }}>
+      <Button variant="outline" onClick={() => { setDifficultyFilter("all"); setCuisineFilter("all"); setChefFilter(""); setChefQuery(""); setMaxTime(null); }}>
         Clear filters
       </Button>
     </div>
@@ -287,6 +352,12 @@ const filteredRecipes = recipes.filter((recipe) => {
                   </div>
 
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    {recipe.chef && (
+                      <div className="flex items-center gap-1">
+                        <ChefHat className="w-4 h-4" />
+                        <span>{recipe.chef}</span>
+                      </div>
+                    )}
                     {(recipe.prep_time || recipe.cook_time) && (
                       <div className="flex items-center gap-1">
                         <Clock className="w-4 h-4" />

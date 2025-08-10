@@ -25,6 +25,7 @@ interface ManualRecipeForm {
   servings: string;
   difficulty: string;
   cuisine: string;
+  chef: string;
 }
 
 export const AddRecipeDialog = ({ children }: AddRecipeDialogProps) => {
@@ -35,7 +36,7 @@ export const AddRecipeDialog = ({ children }: AddRecipeDialogProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
   
-  const [manualForm, setManualForm] = useState<ManualRecipeForm>({
+const [manualForm, setManualForm] = useState<ManualRecipeForm>({
     title: '',
     description: '',
     ingredients: '',
@@ -44,7 +45,8 @@ export const AddRecipeDialog = ({ children }: AddRecipeDialogProps) => {
     cook_time: '',
     servings: '',
     difficulty: 'Easy',
-    cuisine: ''
+    cuisine: '',
+    chef: ''
   });
 
   const handleSocialMediaExtraction = async () => {
@@ -125,7 +127,7 @@ export const AddRecipeDialog = ({ children }: AddRecipeDialogProps) => {
         .filter(item => item.trim())
         .map(item => item.trim());
 
-      const { error } = await supabase
+const { error } = await supabase
         .from('recipes')
         .insert({
           user_id: user.id,
@@ -138,6 +140,7 @@ export const AddRecipeDialog = ({ children }: AddRecipeDialogProps) => {
           servings: manualForm.servings ? parseInt(manualForm.servings) : null,
           difficulty: manualForm.difficulty,
           cuisine: manualForm.cuisine || null,
+          chef: manualForm.chef || null,
         });
 
       if (error) throw error;
@@ -163,7 +166,7 @@ export const AddRecipeDialog = ({ children }: AddRecipeDialogProps) => {
     setOpen(false);
     setMode('select');
     setUrl('');
-    setManualForm({
+setManualForm({
       title: '',
       description: '',
       ingredients: '',
@@ -172,7 +175,8 @@ export const AddRecipeDialog = ({ children }: AddRecipeDialogProps) => {
       cook_time: '',
       servings: '',
       difficulty: 'Easy',
-      cuisine: ''
+      cuisine: '',
+      chef: ''
     });
   };
 
@@ -296,7 +300,7 @@ export const AddRecipeDialog = ({ children }: AddRecipeDialogProps) => {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="title">Recipe Title *</Label>
                   <Input
@@ -313,6 +317,15 @@ export const AddRecipeDialog = ({ children }: AddRecipeDialogProps) => {
                     placeholder="Italian, Chinese, etc."
                     value={manualForm.cuisine}
                     onChange={(e) => setManualForm({ ...manualForm, cuisine: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="chef">Chef</Label>
+                  <Input
+                    id="chef"
+                    placeholder="e.g., Binging with Babish"
+                    value={manualForm.chef}
+                    onChange={(e) => setManualForm({ ...manualForm, chef: e.target.value })}
                   />
                 </div>
               </div>
