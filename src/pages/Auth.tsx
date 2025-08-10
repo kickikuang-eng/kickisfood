@@ -99,6 +99,23 @@ const Auth = () => {
     }
   };
 
+  const handleOAuthSignIn = async (provider: 'google' | 'azure' | 'apple') => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: provider as any,
+        options: { redirectTo: `${window.location.origin}/` },
+      });
+      if (error) {
+        toast({ title: 'Sign in error', description: error.message, variant: 'destructive' });
+      }
+    } catch (err) {
+      toast({ title: 'Error', description: 'Unable to start sign in', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
@@ -213,6 +230,7 @@ const Auth = () => {
               variant="outline"
               className="w-full h-12 border border-gray-300 hover:bg-gray-50 justify-start gap-3 text-foreground hover:text-foreground"
               disabled={isLoading}
+              onClick={() => handleOAuthSignIn('google')}
             >
               <div className="w-5 h-5 flex items-center justify-center">
                 <svg viewBox="0 0 24 24" className="w-5 h-5">
@@ -229,6 +247,7 @@ const Auth = () => {
               variant="outline"
               className="w-full h-12 border border-gray-300 hover:bg-gray-50 justify-start gap-3 text-foreground hover:text-foreground"
               disabled={isLoading}
+              onClick={() => handleOAuthSignIn('azure')}
             >
               <img src={microsoftLogo} alt="Microsoft logo" className="w-5 h-5" loading="lazy" aria-hidden="true" />
               Continue with Microsoft Account
@@ -238,6 +257,7 @@ const Auth = () => {
               variant="outline"
               className="w-full h-12 border border-gray-300 hover:bg-gray-50 justify-start gap-3 text-foreground hover:text-foreground"
               disabled={isLoading}
+              onClick={() => handleOAuthSignIn('apple')}
             >
               <img src={appleLogo} alt="Apple logo" className="w-4 h-auto opacity-70" loading="lazy" aria-hidden="true" />
               Continue with Apple
