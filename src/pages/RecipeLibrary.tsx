@@ -10,6 +10,10 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Plus, Search, Clock, Users } from "lucide-react";
 import { AddRecipeDialog } from "@/components/AddRecipeDialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+
 
 interface Recipe {
   id: string;
@@ -34,6 +38,13 @@ const RecipeLibrary = () => {
   const { toast } = useToast();
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+
+  const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
+  const [cuisineFilter, setCuisineFilter] = useState<string>("all");
+  const [maxTime, setMaxTime] = useState<number | null>(null);
+
+  const difficulties = Array.from(new Set(recipes.map(r => r.difficulty).filter(Boolean))) as string[];
+  const cuisines = Array.from(new Set(recipes.map(r => r.cuisine).filter(Boolean))) as string[];
 
   useEffect(() => {
     if (!loading && !user) {
@@ -74,11 +85,26 @@ const RecipeLibrary = () => {
     }
   };
 
-  const filteredRecipes = recipes.filter(recipe =>
-    recipe.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    recipe.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    recipe.cuisine?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+const filteredRecipes = recipes.filter((recipe) => {
+  const query = searchTerm.toLowerCase();
+  const matchesSearch =
+    recipe.title.toLowerCase().includes(query) ||
+    (recipe.description?.toLowerCase().includes(query) ?? false) ||
+    (recipe.cuisine?.toLowerCase().includes(query) ?? false);
+
+  const matchesDifficulty =
+    difficultyFilter === "all" ||
+    (recipe.difficulty?.toLowerCase() === difficultyFilter.toLowerCase());
+
+  const matchesCuisine =
+    cuisineFilter === "all" ||
+    (recipe.cuisine?.toLowerCase() === cuisineFilter.toLowerCase());
+
+  const totalTime = (recipe.prep_time || 0) + (recipe.cook_time || 0);
+  const matchesTime = maxTime == null || totalTime <= maxTime;
+
+  return matchesSearch && matchesDifficulty && matchesCuisine && matchesTime;
+});
 
   const formatTime = (minutes: number | null) => {
     if (!minutes) return null;
@@ -108,16 +134,69 @@ const RecipeLibrary = () => {
           </AddRecipeDialog>
         </div>
 
-        {/* Search Bar */}
-        <div className="relative mb-8">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-          <Input
-            placeholder="Search recipes by title, description, or cuisine..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
+{/* Search + Filters */}
+<div className="space-y-4 mb-8">
+  <div className="relative">
+    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+    <Input
+      placeholder="Search recipes by title, description, or cuisine..."
+      value={searchTerm}
+      onChange={(e) => setSearchTerm(e.target.value)}
+      className="pl-10"
+    />
+  </div>
+
+  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div className="flex flex-col gap-2">
+      <Label htmlFor="difficulty">Difficulty</Label>
+      <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
+        <SelectTrigger id="difficulty">
+          <SelectValue placeholder="All" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All</SelectItem>
+          {difficulties.map((d) => (
+            <SelectItem key={d} value={d}>{d}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+
+    <div className="flex flex-col gap-2">
+      <Label htmlFor="cuisine">Cuisine</Label>
+      <Select value={cuisineFilter} onValueChange={setCuisineFilter}>
+        <SelectTrigger id="cuisine">
+          <SelectValue placeholder="All" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All</SelectItem>
+          {cuisines.map((c) => (
+            <SelectItem key={c} value={c}>{c}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+
+    <div className="flex flex-col gap-2">
+      <Label htmlFor="maxtime">Max total time ({maxTime ?? "∞"} min)</Label>
+      <Slider
+        id="maxtime"
+        min={10}
+        max={240}
+        step={5}
+        value={[maxTime ?? 240]}
+        onValueChange={(vals) => setMaxTime(vals[0] === 240 ? null : vals[0])}
+      />
+      <div className="text-xs text-muted-foreground">Filter by prep + cook time</div>
+    </div>
+
+    <div className="flex items-end">
+      <Button variant="outline" onClick={() => { setDifficultyFilter("all"); setCuisineFilter("all"); setMaxTime(null); }}>
+        Clear filters
+      </Button>
+    </div>
+  </div>
+</div>
 
         {/* Loading State */}
         {isLoading && (
