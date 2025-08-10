@@ -4,7 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Citrus, Mail, Phone, Apple } from "lucide-react";
+import { Citrus, Mail, Phone } from "lucide-react";
+import appleLogo from "@/assets/brands/apple.svg";
+import microsoftLogo from "@/assets/brands/microsoft.svg";
 
 const Auth = () => {
   const [isSignIn, setIsSignIn] = useState(true);
@@ -225,32 +227,25 @@ const Auth = () => {
 
             <Button
               variant="outline"
-              className="w-full h-12 border border-gray-300 hover:bg-gray-50 justify-start gap-3"
+              className="w-full h-12 border border-gray-300 hover:bg-gray-50 justify-start gap-3 text-foreground hover:text-foreground"
               disabled={isLoading}
             >
-              <div className="w-5 h-5 flex items-center justify-center">
-                <svg viewBox="0 0 24 24" className="w-5 h-5">
-                  <path fill="#00BCF2" d="M0 0h11.377v11.372H0z"/>
-                  <path fill="#00BCF2" d="M11.377 0H24v11.372H11.377z"/>
-                  <path fill="#00BCF2" d="M0 11.372h11.377V24H0z"/>
-                  <path fill="#FFC107" d="M11.377 11.372H24V24H11.377z"/>
-                </svg>
-              </div>
+              <img src={microsoftLogo} alt="Microsoft logo" className="w-5 h-5" loading="lazy" aria-hidden="true" />
               Continue with Microsoft Account
             </Button>
 
             <Button
               variant="outline"
-              className="w-full h-12 border border-gray-300 hover:bg-gray-50 justify-start gap-3"
+              className="w-full h-12 border border-gray-300 hover:bg-gray-50 justify-start gap-3 text-foreground hover:text-foreground"
               disabled={isLoading}
             >
-              <Apple className="w-5 h-5" />
+              <img src={appleLogo} alt="Apple logo" className="w-5 h-5" loading="lazy" aria-hidden="true" />
               Continue with Apple
             </Button>
 
             <Button
               variant="outline"
-              className="w-full h-12 border border-gray-300 hover:bg-gray-50 justify-start gap-3"
+              className="w-full h-12 border border-gray-300 hover:bg-gray-50 justify-start gap-3 text-foreground hover:text-foreground"
               disabled={isLoading}
             >
               <Phone className="w-5 h-5" />
