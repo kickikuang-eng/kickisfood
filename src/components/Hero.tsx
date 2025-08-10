@@ -34,34 +34,43 @@ export const Hero = () => {
     setIsLoading(true);
     try {
       if (isVideoUrl(url)) {
-        // Handle video URL - extract recipe using AI
-        const {
-          data,
-          error
-        } = await supabase.functions.invoke('extract-recipe-from-video', {
-          body: {
-            videoUrl: url,
-            userId: user.id
-          }
-        });
-        if (!error && data?.success) {
-          toast({
-            title: "Recipe extracted!",
-            description: `"${data.recipe.title}" has been added to your library.`
-          });
-          setUrl("");
-        } else {
+        // Prefer Gemini for Instagram URLs, otherwise use OpenAI with Gemini fallback
+        const isInstagram = /instagram\.com\/(?:p|reel)\//.test(url);
+        if (isInstagram) {
           const { data: gData, error: gError } = await supabase.functions.invoke('extract-recipe-with-gemini', {
             body: { videoUrl: url, userId: user.id }
           });
           if (!gError && gData?.success) {
-            toast({
-              title: "Recipe extracted!",
-              description: `"${gData.recipe.title}" has been added to your library.`
-            });
+            toast({ title: "Recipe extracted!", description: `"${gData.recipe.title}" has been added to your library.` });
             setUrl("");
           } else {
-            throw new Error(gError?.message || gData?.error || 'Failed to extract recipe');
+            const { data, error } = await supabase.functions.invoke('extract-recipe-from-video', {
+              body: { videoUrl: url, userId: user.id }
+            });
+            if (!error && data?.success) {
+              toast({ title: "Recipe extracted!", description: `"${data.recipe.title}" has been added to your library.` });
+              setUrl("");
+            } else {
+              throw new Error(error?.message || data?.error || 'Failed to extract recipe');
+            }
+          }
+        } else {
+          const { data, error } = await supabase.functions.invoke('extract-recipe-from-video', {
+            body: { videoUrl: url, userId: user.id }
+          });
+          if (!error && data?.success) {
+            toast({ title: "Recipe extracted!", description: `"${data.recipe.title}" has been added to your library.` });
+            setUrl("");
+          } else {
+            const { data: gData, error: gError } = await supabase.functions.invoke('extract-recipe-with-gemini', {
+              body: { videoUrl: url, userId: user.id }
+            });
+            if (!gError && gData?.success) {
+              toast({ title: "Recipe extracted!", description: `"${gData.recipe.title}" has been added to your library.` });
+              setUrl("");
+            } else {
+              throw new Error(gError?.message || gData?.error || 'Failed to extract recipe');
+            }
           }
         }
       } else {
