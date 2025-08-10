@@ -102,16 +102,20 @@ const Auth = () => {
   const handleOAuthSignIn = async (provider: 'google' | 'azure' | 'apple') => {
     try {
       setIsLoading(true);
+      console.log(`[OAuth] Starting ${provider} sign-in`);
       const { error } = await supabase.auth.signInWithOAuth({
         provider: provider as any,
         options: { redirectTo: `${window.location.origin}/` },
       });
       if (error) {
+        console.error(`[OAuth] ${provider} error`, error);
         toast({ title: 'Sign in error', description: error.message, variant: 'destructive' });
+        setIsLoading(false);
       }
+      // Do NOT set isLoading(false) here; Supabase will redirect the page on success.
     } catch (err) {
+      console.error(`[OAuth] ${provider} unexpected error`, err);
       toast({ title: 'Error', description: 'Unable to start sign in', variant: 'destructive' });
-    } finally {
       setIsLoading(false);
     }
   };
