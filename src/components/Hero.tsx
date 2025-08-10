@@ -44,17 +44,25 @@ export const Hero = () => {
             userId: user.id
           }
         });
-        if (error) {
-          throw new Error(error.message);
-        }
-        if (data.success) {
+        if (!error && data?.success) {
           toast({
             title: "Recipe extracted!",
             description: `"${data.recipe.title}" has been added to your library.`
           });
           setUrl("");
         } else {
-          throw new Error(data.error || 'Failed to extract recipe');
+          const { data: gData, error: gError } = await supabase.functions.invoke('extract-recipe-with-gemini', {
+            body: { videoUrl: url, userId: user.id }
+          });
+          if (!gError && gData?.success) {
+            toast({
+              title: "Recipe extracted!",
+              description: `"${gData.recipe.title}" has been added to your library.`
+            });
+            setUrl("");
+          } else {
+            throw new Error(gError?.message || gData?.error || 'Failed to extract recipe');
+          }
         }
       } else {
         // Handle regular recipe URL - placeholder for future web scraping
