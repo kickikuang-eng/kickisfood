@@ -34,27 +34,21 @@ export const Hero = () => {
     setIsLoading(true);
     try {
       if (isVideoUrl(url)) {
-        // Prefer Gemini for Instagram URLs, otherwise use OpenAI with Gemini fallback
         const isInstagram = /instagram\.com\/(?:p|reel)\//.test(url);
-        if (isInstagram) {
-          const { data: gData, error: gError } = await supabase.functions.invoke('extract-recipe-with-gemini', {
+        const isTikTok = /tiktok\.com\/@[\w.-]+\/video\/|tiktok\.com\/t\//.test(url);
+        const isYouTube = /youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\//.test(url);
+
+        if (isInstagram || isTikTok) {
+          const { data, error } = await supabase.functions.invoke('extract-recipe-from-social', {
             body: { videoUrl: url, userId: user.id }
           });
-          if (!gError && gData?.success) {
-            toast({ title: "Recipe extracted!", description: `"${gData.recipe.title}" has been added to your library.` });
+          if (!error && data?.success) {
+            toast({ title: "Recipe extracted!", description: `"${data.recipe.title}" has been added to your library.` });
             setUrl("");
           } else {
-            const { data, error } = await supabase.functions.invoke('extract-recipe-from-video', {
-              body: { videoUrl: url, userId: user.id }
-            });
-            if (!error && data?.success) {
-              toast({ title: "Recipe extracted!", description: `"${data.recipe.title}" has been added to your library.` });
-              setUrl("");
-            } else {
-              throw new Error(error?.message || data?.error || 'Failed to extract recipe');
-            }
+            throw new Error(error?.message || data?.error || 'Failed to extract recipe');
           }
-        } else {
+        } else if (isYouTube) {
           const { data, error } = await supabase.functions.invoke('extract-recipe-from-video', {
             body: { videoUrl: url, userId: user.id }
           });
@@ -71,6 +65,17 @@ export const Hero = () => {
             } else {
               throw new Error(gError?.message || gData?.error || 'Failed to extract recipe');
             }
+          }
+        } else {
+          // Other/unknown platforms
+          const { data, error } = await supabase.functions.invoke('extract-recipe-from-social', {
+            body: { videoUrl: url, userId: user.id }
+          });
+          if (!error && data?.success) {
+            toast({ title: "Recipe extracted!", description: `"${data.recipe.title}" has been added to your library.` });
+            setUrl("");
+          } else {
+            throw new Error(error?.message || data?.error || 'Failed to extract recipe');
           }
         }
       } else {
