@@ -239,7 +239,7 @@ const Auth = () => {
               className="w-full h-12 border border-gray-300 hover:bg-gray-50 justify-start gap-3 text-foreground hover:text-foreground"
               disabled={isLoading}
             >
-              <img src={appleLogo} alt="Apple logo" className="w-5 h-5" loading="lazy" aria-hidden="true" />
+              <img src={appleLogo} alt="Apple logo" className="w-4 h-auto opacity-70" loading="lazy" aria-hidden="true" />
               Continue with Apple
             </Button>
 
