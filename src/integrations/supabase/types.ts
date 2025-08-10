@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       recipes: {
         Row: {
+          chef: string | null
           cook_time: number | null
           created_at: string
           cuisine: string | null
@@ -33,6 +34,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          chef?: string | null
           cook_time?: number | null
           created_at?: string
           cuisine?: string | null
@@ -50,6 +52,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          chef?: string | null
           cook_time?: number | null
           created_at?: string
           cuisine?: string | null
