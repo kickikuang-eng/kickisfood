@@ -209,7 +209,7 @@ const Auth = () => {
           <div className="space-y-3">
             <Button
               variant="outline"
-              className="w-full h-12 border border-gray-300 hover:bg-gray-50 justify-start gap-3"
+              className="w-full h-12 border border-gray-300 hover:bg-gray-50 justify-start gap-3 text-foreground hover:text-foreground"
               disabled={isLoading}
             >
               <div className="w-5 h-5 flex items-center justify-center">
