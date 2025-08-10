@@ -103,16 +103,35 @@ const Auth = () => {
     try {
       setIsLoading(true);
       console.log(`[OAuth] Starting ${provider} sign-in`);
-      const { error } = await supabase.auth.signInWithOAuth({
+      const redirectTo = `${window.location.origin}/`;
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: provider as any,
-        options: { redirectTo: `${window.location.origin}/` },
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+        },
       });
+
       if (error) {
         console.error(`[OAuth] ${provider} error`, error);
         toast({ title: 'Sign in error', description: error.message, variant: 'destructive' });
         setIsLoading(false);
+        return;
       }
-      // Do NOT set isLoading(false) here; Supabase will redirect the page on success.
+
+      if (data?.url) {
+        const isIframed = window.top !== window.self;
+        if (isIframed) {
+          window.open(data.url, '_blank', 'noopener,noreferrer');
+          setIsLoading(false);
+        } else {
+          window.location.href = data.url;
+          // No setIsLoading(false) here; full-page redirect
+        }
+      } else {
+        console.warn(`[OAuth] ${provider} no URL returned`);
+        setIsLoading(false);
+      }
     } catch (err) {
       console.error(`[OAuth] ${provider} unexpected error`, err);
       toast({ title: 'Error', description: 'Unable to start sign in', variant: 'destructive' });
