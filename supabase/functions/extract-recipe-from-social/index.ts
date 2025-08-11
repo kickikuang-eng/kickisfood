@@ -257,8 +257,11 @@ const insertPayload = {
     });
   } catch (err: any) {
     console.error("extract-recipe-from-social error", err);
-    return new Response(JSON.stringify({ success: false, error: err?.message || "Unexpected error" } satisfies ExtractResponse), {
-      status: 500,
+    const msg = String(err?.message || "Unexpected error");
+    const isFirecrawlBlocked = /Firecrawl error:\s*403/i.test(msg);
+    const body = { success: false, error: msg } satisfies ExtractResponse;
+    return new Response(JSON.stringify(body), {
+      status: isFirecrawlBlocked ? 200 : 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
