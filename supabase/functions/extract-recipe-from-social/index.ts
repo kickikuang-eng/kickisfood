@@ -223,22 +223,30 @@ serve(async (req) => {
     if (platform === "instagram") {
       try {
         const appId = Deno.env.get("FACEBOOK_APP_ID");
+        const clientToken = Deno.env.get("FACEBOOK_CLIENT_TOKEN");
         const appSecret = Deno.env.get("FACEBOOK_APP_SECRET");
-        if (appId && appSecret) {
-          const accessToken = `${appId}|${appSecret}`;
+        if (appId && (clientToken || appSecret)) {
+          const accessToken = `${appId}|${clientToken ?? appSecret}`;
           const oembedUrl = `https://graph.facebook.com/v19.0/instagram_oembed?url=${encodeURIComponent(videoUrl)}&access_token=${accessToken}&omitscript=true`;
           const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 10000);
-          const oRes = await fetch(oembedUrl, { signal: controller.signal });
+          const timer = setTimeout(() => controller.abort(), 12000);
+          const oRes = await fetch(oembedUrl, {
+            signal: controller.signal,
+            headers: {
+              "Accept": "application/json",
+              "User-Agent": "Mozilla/5.0 (compatible; LovableBot/1.0; +https://lovable.dev)"
+            }
+          });
           clearTimeout(timer);
           if (oRes.ok) {
             igOembed = await oRes.json();
             ogImage = igOembed?.thumbnail_url || null;
           } else {
-            console.warn("Instagram oEmbed request failed", oRes.status, await oRes.text());
+            const txt = await oRes.text();
+            console.warn("Instagram oEmbed request failed", oRes.status, txt);
           }
         } else {
-          console.warn("FACEBOOK_APP_ID or FACEBOOK_APP_SECRET is not set; skipping oEmbed.");
+          console.warn("FACEBOOK_APP_ID and FACEBOOK_CLIENT_TOKEN/APP_SECRET not set; skipping oEmbed.");
         }
       } catch (e) {
         console.warn("oEmbed fetch error", e);
