@@ -355,7 +355,7 @@ const filteredRecipes = recipes.filter((recipe) => {
 >
   <Trash2 className="w-4 h-4" />
 </Button>
-<CardHeader>
+<CardHeader className="pr-12">
                   <CardTitle className="line-clamp-2">{recipe.title}</CardTitle>
                   {recipe.description && (
                     <CardDescription className="line-clamp-2">
