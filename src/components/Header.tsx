@@ -1,4 +1,4 @@
-import { Citrus, BookOpen, User, LogOut } from "lucide-react";
+import { Citrus, BookOpen, User, LogOut, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -39,6 +39,15 @@ export const Header = () => {
                   >
                     <BookOpen className="w-4 h-4" />
                     My Library
+                  </Button>
+                </Link>
+                <Link to="/shopping">
+                  <Button 
+                    variant={location.pathname === '/shopping' ? 'default' : 'ghost'}
+                    className="flex items-center gap-2"
+                  >
+                    <ShoppingCart className="w-4 h-4" />
+                    Shopping
                   </Button>
                 </Link>
                 <DropdownMenu>

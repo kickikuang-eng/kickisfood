@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { AddToShoppingListDialog } from "@/components/AddToShoppingListDialog";
 import { 
   ArrowLeft, 
   Clock, 
@@ -538,11 +539,15 @@ const RecipeDetail = () => {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xl">Ingredients</CardTitle>
-                {isEditing && (
+                {isEditing ? (
                   <Button variant="outline" size="sm" onClick={addIngredient}>
                     <Plus className="w-4 h-4 mr-2" />
                     Add
                   </Button>
+                ) : (
+                  recipe.ingredients && recipe.ingredients.length > 0 ? (
+                    <AddToShoppingListDialog recipe={{ id: recipe.id, title: recipe.title, ingredients: recipe.ingredients }} />
+                  ) : null
                 )}
               </div>
             </CardHeader>
