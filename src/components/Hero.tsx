@@ -17,7 +17,7 @@ export const Hero = () => {
     user
   } = useAuth();
   const isVideoUrl = (url: string) => {
-    const videoPatterns = [/youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\//, /tiktok\.com\/@[\w.-]+\/video\/|tiktok\.com\/t\//, /instagram\.com\/(?:p|reel)\//];
+    const videoPatterns = [/youtube\.com\/(watch\?v=|embed\/|shorts\/)|youtu\.be\//, /tiktok\.com\/@[\w.-]+\/video\/|tiktok\.com\/t\//, /instagram\.com\/(?:p|reel)\//];
     return videoPatterns.some(pattern => pattern.test(url));
   };
   const handleUrlSubmit = async (e: React.FormEvent) => {
@@ -36,7 +36,7 @@ export const Hero = () => {
       if (isVideoUrl(url)) {
         const isInstagram = /instagram\.com\/(?:p|reel)\//.test(url);
         const isTikTok = /tiktok\.com\/@[\w.-]+\/video\/|tiktok\.com\/t\//.test(url);
-        const isYouTube = /youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\//.test(url);
+        const isYouTube = /youtube\.com\/(watch\?v=|embed\/|shorts\/)|youtu\.be\//.test(url);
 
         if (isInstagram || isTikTok) {
           const { data, error } = await supabase.functions.invoke('extract-recipe-from-social', {

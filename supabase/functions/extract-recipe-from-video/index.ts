@@ -97,28 +97,45 @@ const { data: recipe, error } = await supabase
 });
 
 function extractVideoInfo(url: string) {
-  // YouTube
-  const youtubeRegex = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/;
-  const youtubeMatch = url.match(youtubeRegex);
-  if (youtubeMatch) {
-    return { platform: 'youtube', id: youtubeMatch[1] };
-  }
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace('www.', '');
+    const path = u.pathname;
+    const params = u.searchParams;
 
-  // TikTok
-  const tiktokRegex = /tiktok\.com\/@[\w.-]+\/video\/(\d+)|tiktok\.com\/t\/(\w+)/;
-  const tiktokMatch = url.match(tiktokRegex);
-  if (tiktokMatch) {
-    return { platform: 'tiktok', id: tiktokMatch[1] || tiktokMatch[2] };
-  }
+    // YouTube variations: watch?v=, youtu.be/<id>, /embed/<id>, /shorts/<id>
+    if (host.includes('youtube.com') || host.includes('youtu.be')) {
+      let id: string | null = null;
 
-  // Instagram
-  const instaRegex = /instagram\.com\/(?:p|reel)\/([^\/\?]+)/;
-  const instaMatch = url.match(instaRegex);
-  if (instaMatch) {
-    return { platform: 'instagram', id: instaMatch[1] };
-  }
+      if (host.includes('youtu.be')) {
+        id = path.split('/').filter(Boolean)[0] || null; // first segment
+      } else {
+        id = params.get('v');
+        if (!id && path.startsWith('/embed/')) id = path.split('/')[2] || null;
+        if (!id && path.startsWith('/shorts/')) id = path.split('/')[2] || null;
+      }
 
-  return null;
+      if (id) return { platform: 'youtube', id };
+    }
+
+    // TikTok
+    const tiktokRegex = /tiktok\.com\/@[\w.-]+\/video\/(\d+)|tiktok\.com\/t\/(\w+)/;
+    const tiktokMatch = url.match(tiktokRegex);
+    if (tiktokMatch) {
+      return { platform: 'tiktok', id: tiktokMatch[1] || tiktokMatch[2] };
+    }
+
+    // Instagram
+    const instaRegex = /instagram\.com\/(?:p|reel)\/([^\/\?]+)/;
+    const instaMatch = url.match(instaRegex);
+    if (instaMatch) {
+      return { platform: 'instagram', id: instaMatch[1] };
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function extractAuthorFromUrl(url: string): string | null {
@@ -153,7 +170,8 @@ function extractAuthorFromUrl(url: string): string | null {
 function getVideoThumbnail(videoInfo: { platform: string; id: string }): string {
   switch (videoInfo.platform) {
     case 'youtube':
-      return `https://img.youtube.com/vi/${videoInfo.id}/maxresdefault.jpg`;
+      // hqdefault is more reliably available than maxresdefault
+      return `https://img.youtube.com/vi/${videoInfo.id}/hqdefault.jpg`;
     case 'tiktok':
       // Try to get TikTok thumbnail - this may not always work due to TikTok's restrictions
       return `https://www.tiktok.com/oembed?url=https://www.tiktok.com/@user/video/${videoInfo.id}`;
@@ -213,7 +231,7 @@ Make it clear that this is a placeholder and the user should manually review and
 
   // For non-image URLs (Instagram/TikTok), make a text-only request
   const requestBody = isActualImage ? {
-    model: 'gpt-4o',
+    model: 'gpt-4o-mini',
     messages: [
       {
         role: 'user',
@@ -226,7 +244,7 @@ Make it clear that this is a placeholder and the user should manually review and
     max_tokens: 1500,
     temperature: 0.7,
   } : {
-    model: 'gpt-4o',
+    model: 'gpt-4o-mini',
     messages: [
       {
         role: 'user',
@@ -237,54 +255,72 @@ Make it clear that this is a placeholder and the user should manually review and
     temperature: 0.7,
   };
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openAIApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(requestBody),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('OpenAI API error:', error);
-    throw new Error('Failed to analyze video content');
-  }
-
-  const data = await response.json();
-  const content = data.choices[0].message.content;
-  
   try {
-    // Extract JSON from the response
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('No JSON found in response');
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('OpenAI API error:', error);
+      // Return a safe placeholder for YouTube as well so the import succeeds
+      return placeholderRecipe(videoUrl);
     }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content ?? '';
     
-    const recipeData = JSON.parse(jsonMatch[0]);
-    
-    // Validate required fields
-    if (!recipeData.title || !recipeData.ingredients || !recipeData.instructions) {
-      throw new Error('Missing required recipe fields');
+    try {
+      // Extract JSON from the response
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON found in response');
+      }
+      
+      const recipeData = JSON.parse(jsonMatch[0]);
+      
+      // Validate required fields
+      if (!recipeData.title || !recipeData.ingredients || !recipeData.instructions) {
+        throw new Error('Missing required recipe fields');
+      }
+      
+      return recipeData;
+    } catch (error) {
+      console.error('Failed to parse recipe data:', error);
+      console.log('Raw OpenAI response:', content);
+      
+      // Fallback response
+      return placeholderRecipe(videoUrl);
     }
-    
-    return recipeData;
-  } catch (error) {
-    console.error('Failed to parse recipe data:', error);
-    console.log('Raw OpenAI response:', content);
-    
-    // Fallback response
-    return {
-      title: 'Recipe from Video',
-      description: 'Recipe extracted from social media video',
-      ingredients: ['Ingredients detected from video - please review and edit'],
-      instructions: ['Instructions extracted from video - please review and edit'],
-      prep_time: 15,
-      cook_time: 30,
-      servings: 4,
-      difficulty: 'Medium',
-      cuisine: null
-    };
+  } catch (err) {
+    console.error('OpenAI request failed:', err);
+    return placeholderRecipe(videoUrl);
   }
+}
+
+function placeholderRecipe(videoUrl: string) {
+  const isYouTube = videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be');
+  const platform = isYouTube ? 'YouTube' : (videoUrl.includes('instagram') ? 'Instagram' : 'TikTok');
+  return {
+    title: `Recipe from ${platform} Video - Manual Review Needed`,
+    description: `This is a placeholder recipe. The actual ${platform} video content could not be analyzed automatically. Please review the video and edit this recipe.`,
+    ingredients: ['1 cup placeholder ingredient', '2 teaspoons placeholder spice', '1 tablespoon placeholder oil', 'Salt to taste', 'Pepper to taste'],
+    instructions: [
+      'Step 1: Review the video manually to gather the actual ingredients and instructions.',
+      'Step 2: Replace placeholder ingredients with those identified from the video.',
+      'Step 3: Follow the cooking steps as demonstrated in the video.',
+      'Step 4: Adjust seasoning and cooking times as needed.',
+      'Step 5: Enjoy your dish!'
+    ],
+    prep_time: 15,
+    cook_time: 30,
+    servings: 4,
+    difficulty: 'Medium',
+    cuisine: null,
+  };
 }
