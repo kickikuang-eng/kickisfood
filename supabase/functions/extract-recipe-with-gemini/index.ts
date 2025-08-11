@@ -156,6 +156,47 @@ function normalizeRecipe(raw: any) {
   return recipe;
 }
 
+function extractAuthorFromUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    const host = u.hostname;
+    const path = u.pathname;
+
+    if (host.includes('tiktok.com')) {
+      const m = path.match(/\/@[\w.-]+/);
+      if (m) return m[0];
+    }
+
+    if (host.includes('instagram.com')) {
+      const seg = path.split('/').filter(Boolean);
+      if (seg.length > 0 && !['reel', 'p'].includes(seg[0])) return seg[0];
+    }
+
+    if (host.includes('youtube.com') || host.includes('youtu.be')) {
+      const mHandle = path.match(/\/(@[^\/?#]+)/);
+      if (mHandle) return mHandle[1];
+      const mC = path.match(/\/c\/([^\/?#]+)/);
+      if (mC) return mC[1];
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchYouTubeAuthor(videoUrl: string): Promise<string | null> {
+  try {
+    const oembed = `https://www.youtube.com/oembed?url=${encodeURIComponent(videoUrl)}&format=json`;
+    const res = await fetch(oembed);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return typeof data?.author_name === 'string' ? data.author_name : null;
+  } catch {
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -206,6 +247,9 @@ serve(async (req) => {
 
     const recipe = normalizeRecipe(parsed);
 
+    // Derive chef/author from URL where possible
+    const derivedChef = extractAuthorFromUrl(videoUrl) || (info.platform === 'youtube' ? await fetchYouTubeAuthor(videoUrl) : null);
+
     // Insert into database
     const insertPayload: any = {
       user_id: userId,
@@ -215,11 +259,12 @@ serve(async (req) => {
       instructions: recipe.instructions,
       image_url: thumbnailUrl || null,
       source_url: videoUrl,
-      prep_time_minutes: recipe.prep_time_minutes,
-      cook_time_minutes: recipe.cook_time_minutes,
+      prep_time: recipe.prep_time_minutes, // map minutes -> prep_time column
+      cook_time: recipe.cook_time_minutes, // map minutes -> cook_time column
       servings: recipe.servings,
       cuisine: recipe.cuisine,
       difficulty: recipe.difficulty,
+      chef: derivedChef || null,
     };
 
     const { data: inserted, error: dbError } = await supabase

@@ -47,8 +47,10 @@ serve(async (req) => {
 
 // Save to Supabase
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
-const chef = extractAuthorFromUrl(videoUrl);
-
+let chef = extractAuthorFromUrl(videoUrl);
+if (!chef && videoInfo.platform === 'youtube') {
+  chef = await fetchYouTubeAuthor(videoUrl);
+}
 const { data: recipe, error } = await supabase
   .from('recipes')
   .insert({
@@ -145,16 +147,18 @@ function extractAuthorFromUrl(url: string): string | null {
     const path = u.pathname;
 
     if (host.includes('tiktok.com')) {
-      const m = path.match(/\/(@[\w.-]+)\/video\//);
-      if (m) return m[1];
+      const m = path.match(/\/@[\w.-]+/);
+      if (m) return m[0];
     }
 
     if (host.includes('instagram.com')) {
-      const m = path.match(/^\/([^\/?#]+)\/(reel|p)\//);
-      if (m && m[1] && !['reel', 'p'].includes(m[1])) return m[1];
+      const seg = path.split('/').filter(Boolean);
+      // username is the first segment for typical reel/p URLs
+      if (seg.length > 0 && !['reel', 'p'].includes(seg[0])) return seg[0];
     }
 
-    if (host.includes('youtube.com')) {
+    if (host.includes('youtube.com') || host.includes('youtu.be')) {
+      // Often not present in watch URLs; try to capture @handle if present
       const mHandle = path.match(/\/(@[^\/?#]+)/);
       if (mHandle) return mHandle[1];
       const mC = path.match(/\/c\/([^\/?#]+)/);
@@ -167,6 +171,17 @@ function extractAuthorFromUrl(url: string): string | null {
   }
 }
 
+async function fetchYouTubeAuthor(videoUrl: string): Promise<string | null> {
+  try {
+    const oembed = `https://www.youtube.com/oembed?url=${encodeURIComponent(videoUrl)}&format=json`;
+    const res = await fetch(oembed);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return typeof data?.author_name === 'string' ? data.author_name : null;
+  } catch {
+    return null;
+  }
+}
 function getVideoThumbnail(videoInfo: { platform: string; id: string }): string {
   switch (videoInfo.platform) {
     case 'youtube':
