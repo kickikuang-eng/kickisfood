@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Search, Clock, Users, ChefHat, ChevronsUpDown } from "lucide-react";
+import { Plus, Search, Clock, Users, ChefHat, ChevronsUpDown, Trash2 } from "lucide-react";
 import { AddRecipeDialog } from "@/components/AddRecipeDialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -89,6 +89,27 @@ const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Delete this recipe?')) return;
+    try {
+      const { error } = await supabase
+        .from('recipes')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        toast({ title: 'Error', description: 'Failed to delete recipe', variant: 'destructive' });
+        return;
+      }
+
+      setRecipes((prev) => prev.filter((r) => r.id !== id));
+      toast({ title: 'Deleted', description: 'Recipe removed.' });
+    } catch (err) {
+      console.error('Error deleting recipe:', err);
+      toast({ title: 'Error', description: 'Failed to delete recipe', variant: 'destructive' });
     }
   };
 
@@ -322,10 +343,19 @@ const filteredRecipes = recipes.filter((recipe) => {
             {filteredRecipes.map((recipe) => (
               <Card 
                 key={recipe.id} 
-                className="group hover:shadow-lg transition-shadow cursor-pointer"
+                className="relative group hover:shadow-lg transition-shadow cursor-pointer"
                 onClick={() => navigate(`/recipe/${recipe.id}`)}
               >
-                <CardHeader>
+<Button
+  variant="ghost"
+  size="icon"
+  aria-label="Delete recipe"
+  className="absolute top-2 right-2 z-10"
+  onClick={(e) => { e.stopPropagation(); handleDelete(recipe.id); }}
+>
+  <Trash2 className="w-4 h-4" />
+</Button>
+<CardHeader>
                   <CardTitle className="line-clamp-2">{recipe.title}</CardTitle>
                   {recipe.description && (
                     <CardDescription className="line-clamp-2">
