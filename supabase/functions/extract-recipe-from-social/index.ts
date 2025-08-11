@@ -27,38 +27,6 @@ function parseOgImageFromHtml(html?: string | null): string | null {
   return match ? match[1] : null;
 }
 
-function extractAuthorFromUrl(url: string): string | null {
-  try {
-    const u = new URL(url);
-    const host = u.hostname;
-    const path = u.pathname;
-
-    // TikTok: /@username/video/12345
-    if (host.includes("tiktok.com")) {
-      const m = path.match(/\/(@[\w.-]+)\/video\//);
-      if (m) return m[1];
-    }
-
-    // Instagram: /username/reel/{id} or /username/p/{id}
-    if (host.includes("instagram.com")) {
-      const m = path.match(/^\/([^\/?#]+)\/(reel|p)\//);
-      if (m && m[1] && !["reel", "p"].includes(m[1])) return m[1];
-    }
-
-    // YouTube: /@channelHandle/..., /c/Name, /channel/...
-    if (host.includes("youtube.com")) {
-      const mHandle = path.match(/\/(@[^\/?#]+)/);
-      if (mHandle) return mHandle[1];
-      const mC = path.match(/\/c\/([^\/?#]+)/);
-      if (mC) return mC[1];
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 async function scrapeWithFirecrawl(targetUrl: string): Promise<{ markdown?: string; html?: string; finalUrl?: string; }> {
   const apiKey = Deno.env.get("FIRECRAWL_API_KEY");
   if (!apiKey) throw new Error("FIRECRAWL_API_KEY is not set");
@@ -115,8 +83,7 @@ Fields:
   "cook_time_minutes": number|null,  // integer minutes
   "cuisine": string|null,            // optional e.g. Mexican
   "difficulty": string|null,         // optional e.g. Easy/Medium/Hard
-  "image_url": string|null,          // publicly accessible image URL for the dish if available
-  "chef": string|null                // creator/channel/handle if available
+  "image_url": string|null           // publicly accessible image URL for the dish if available
 }
 
 Source URL (${platform}): ${sourceUrl}
@@ -160,7 +127,7 @@ function parseJsonFromText(text: string): any {
   }
 }
 
-function normalizeRecipe(raw: any, fallbackImage?: string | null, authorFromUrl?: string | null) {
+function normalizeRecipe(raw: any, fallbackImage?: string | null) {
   const toInt = (v: any) => {
     if (v === null || v === undefined || v === "") return null;
     const n = parseInt(String(v), 10);
@@ -183,7 +150,6 @@ function normalizeRecipe(raw: any, fallbackImage?: string | null, authorFromUrl?
     image_url: raw?.image_url || fallbackImage || null,
     cuisine: raw?.cuisine ? String(raw.cuisine) : null,
     difficulty: raw?.difficulty ? String(raw.difficulty) : null,
-    chef: raw?.chef ? String(raw.chef).trim() : (authorFromUrl || null),
   };
 }
 
@@ -216,27 +182,25 @@ serve(async (req) => {
     const ogImage = parseOgImageFromHtml(scraped.html);
 
     // Analyze
-const prompt = buildPrompt(videoUrl, platform, scraped.markdown, scraped.html);
-const raw = await analyzeWithGemini(prompt);
-const authorFromUrl = extractAuthorFromUrl(videoUrl);
-const normalized = normalizeRecipe(raw, ogImage, authorFromUrl);
+    const prompt = buildPrompt(videoUrl, platform, scraped.markdown, scraped.html);
+    const raw = await analyzeWithGemini(prompt);
+    const normalized = normalizeRecipe(raw, ogImage);
 
     // Insert
-const insertPayload = {
-  user_id: userId,
-  title: normalized.title,
-  description: normalized.description,
-  ingredients: normalized.ingredients,
-  instructions: normalized.instructions,
-  prep_time: normalized.prep_time,
-  cook_time: normalized.cook_time,
-  servings: normalized.servings,
-  image_url: normalized.image_url,
-  source_url: videoUrl,
-  cuisine: normalized.cuisine,
-  difficulty: normalized.difficulty,
-  chef: normalized.chef,
-};
+    const insertPayload = {
+      user_id: userId,
+      title: normalized.title,
+      description: normalized.description,
+      ingredients: normalized.ingredients,
+      instructions: normalized.instructions,
+      prep_time: normalized.prep_time,
+      cook_time: normalized.cook_time,
+      servings: normalized.servings,
+      image_url: normalized.image_url,
+      source_url: videoUrl,
+      cuisine: normalized.cuisine,
+      difficulty: normalized.difficulty,
+    };
 
     const { data: inserted, error: insertError } = await supabase
       .from("recipes")
@@ -257,11 +221,8 @@ const insertPayload = {
     });
   } catch (err: any) {
     console.error("extract-recipe-from-social error", err);
-    const msg = String(err?.message || "Unexpected error");
-    const isFirecrawlBlocked = /Firecrawl error:\s*403/i.test(msg);
-    const body = { success: false, error: msg } satisfies ExtractResponse;
-    return new Response(JSON.stringify(body), {
-      status: isFirecrawlBlocked ? 200 : 500,
+    return new Response(JSON.stringify({ success: false, error: err?.message || "Unexpected error" } satisfies ExtractResponse), {
+      status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

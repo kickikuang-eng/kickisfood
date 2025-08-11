@@ -8,13 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Search, Clock, Users, ChefHat, ChevronsUpDown, Trash2 } from "lucide-react";
+import { Plus, Search, Clock, Users, ChefHat, ChevronsUpDown } from "lucide-react";
 import { AddRecipeDialog } from "@/components/AddRecipeDialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 
 
 interface Recipe {
@@ -89,27 +89,6 @@ const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
       });
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Delete this recipe?')) return;
-    try {
-      const { error } = await supabase
-        .from('recipes')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        toast({ title: 'Error', description: 'Failed to delete recipe', variant: 'destructive' });
-        return;
-      }
-
-      setRecipes((prev) => prev.filter((r) => r.id !== id));
-      toast({ title: 'Deleted', description: 'Recipe removed.' });
-    } catch (err) {
-      console.error('Error deleting recipe:', err);
-      toast({ title: 'Error', description: 'Failed to delete recipe', variant: 'destructive' });
     }
   };
 
@@ -219,49 +198,47 @@ const filteredRecipes = recipes.filter((recipe) => {
             <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
           </Button>
         </PopoverTrigger>
-<PopoverContent className="w-[240px] p-0 z-50 bg-background">
-  <Command>
-    <CommandInput
-      placeholder="Type a chef..."
-      value={chefQuery}
-      onValueChange={setChefQuery}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          setChefFilter(chefQuery);
-          setChefOpen(false);
-        }
-      }}
-    />
-    <CommandList>
-      <CommandEmpty>No chefs found.</CommandEmpty>
-      <CommandGroup>
-        <CommandItem
-          value="all"
-          onSelect={() => {
-            setChefFilter("");
-            setChefQuery("");
-            setChefOpen(false);
-          }}
-        >
-          All
-        </CommandItem>
-{chefs.map((c) => (
-  <CommandItem
-    key={c ?? "unknown"}
-    value={String(c ?? "")}
-    onSelect={(val) => {
-      setChefFilter(val);
-      setChefQuery(val);
-      setChefOpen(false);
-    }}
-  >
-    {c}
-  </CommandItem>
-))}
-      </CommandGroup>
-    </CommandList>
-  </Command>
-</PopoverContent>
+        <PopoverContent className="w-[240px] p-0 z-50 bg-background">
+          <Command>
+            <CommandInput
+              placeholder="Type a chef..."
+              value={chefQuery}
+              onValueChange={setChefQuery}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setChefFilter(chefQuery);
+                  setChefOpen(false);
+                }
+              }}
+            />
+            <CommandEmpty>No chefs found.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="all"
+                onSelect={() => {
+                  setChefFilter("");
+                  setChefQuery("");
+                  setChefOpen(false);
+                }}
+              >
+                All
+              </CommandItem>
+              {chefs.map((c) => (
+                <CommandItem
+                  key={c}
+                  value={c}
+                  onSelect={(val) => {
+                    setChefFilter(val);
+                    setChefQuery(val);
+                    setChefOpen(false);
+                  }}
+                >
+                  {c}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </Command>
+        </PopoverContent>
       </Popover>
     </div>
 
@@ -343,19 +320,10 @@ const filteredRecipes = recipes.filter((recipe) => {
             {filteredRecipes.map((recipe) => (
               <Card 
                 key={recipe.id} 
-                className="relative group hover:shadow-lg transition-shadow cursor-pointer"
+                className="group hover:shadow-lg transition-shadow cursor-pointer"
                 onClick={() => navigate(`/recipe/${recipe.id}`)}
               >
-<Button
-  variant="ghost"
-  size="icon"
-  aria-label="Delete recipe"
-  className="absolute top-2 right-2 z-10"
-  onClick={(e) => { e.stopPropagation(); handleDelete(recipe.id); }}
->
-  <Trash2 className="w-4 h-4" />
-</Button>
-<CardHeader className="pr-12">
+                <CardHeader>
                   <CardTitle className="line-clamp-2">{recipe.title}</CardTitle>
                   {recipe.description && (
                     <CardDescription className="line-clamp-2">

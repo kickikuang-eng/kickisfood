@@ -45,29 +45,27 @@ serve(async (req) => {
     const recipeData = await analyzeVideoForRecipe(imageUrl, videoUrl);
     console.log('Recipe analysis completed:', recipeData);
 
-// Save to Supabase
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-const chef = extractAuthorFromUrl(videoUrl);
-
-const { data: recipe, error } = await supabase
-  .from('recipes')
-  .insert({
-    user_id: userId,
-    title: recipeData.title,
-    description: recipeData.description,
-    ingredients: recipeData.ingredients,
-    instructions: recipeData.instructions,
-    prep_time: recipeData.prep_time,
-    cook_time: recipeData.cook_time,
-    servings: recipeData.servings,
-    difficulty: recipeData.difficulty,
-    cuisine: recipeData.cuisine,
-    source_url: videoUrl,
-    image_url: imageUrl,
-    chef: chef || null,
-  })
-  .select()
-  .single();
+    // Save to Supabase
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    const { data: recipe, error } = await supabase
+      .from('recipes')
+      .insert({
+        user_id: userId,
+        title: recipeData.title,
+        description: recipeData.description,
+        ingredients: recipeData.ingredients,
+        instructions: recipeData.instructions,
+        prep_time: recipeData.prep_time,
+        cook_time: recipeData.cook_time,
+        servings: recipeData.servings,
+        difficulty: recipeData.difficulty,
+        cuisine: recipeData.cuisine,
+        source_url: videoUrl,
+        image_url: imageUrl
+      })
+      .select()
+      .single();
 
     if (error) {
       console.error('Error saving recipe:', error);
@@ -84,13 +82,13 @@ const { data: recipe, error } = await supabase
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in extract-recipe-from-video function:', error);
     return new Response(JSON.stringify({ 
       error: error.message || 'Failed to extract recipe from video',
       success: false 
     }), {
-      status: 200,
+      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
@@ -98,15 +96,10 @@ const { data: recipe, error } = await supabase
 
 function extractVideoInfo(url: string) {
   // YouTube
-  const youtubeRegex = /(?:youtube\.com\/(watch\?v=|embed\/)||youtu\.be\/)([^&\n?#]+)/;
+  const youtubeRegex = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/;
   const youtubeMatch = url.match(youtubeRegex);
   if (youtubeMatch) {
-    return { platform: 'youtube', id: youtubeMatch[2] || youtubeMatch[1] } as any;
-  }
-  // YouTube Shorts
-  const shortsMatch = url.match(/youtube\.com\/shorts\/([^&\n?#]+)/);
-  if (shortsMatch) {
-    return { platform: 'youtube', id: shortsMatch[1] };
+    return { platform: 'youtube', id: youtubeMatch[1] };
   }
 
   // TikTok
@@ -126,39 +119,10 @@ function extractVideoInfo(url: string) {
   return null;
 }
 
-function extractAuthorFromUrl(url: string): string | null {
-  try {
-    const u = new URL(url);
-    const host = u.hostname;
-    const path = u.pathname;
-
-    if (host.includes('tiktok.com')) {
-      const m = path.match(/\/(@[\w.-]+)\/video\//);
-      if (m) return m[1];
-    }
-
-    if (host.includes('instagram.com')) {
-      const m = path.match(/^\/([^\/?#]+)\/(reel|p)\//);
-      if (m && m[1] && !['reel', 'p'].includes(m[1])) return m[1];
-    }
-
-    if (host.includes('youtube.com')) {
-      const mHandle = path.match(/\/(@[^\/?#]+)/);
-      if (mHandle) return mHandle[1];
-      const mC = path.match(/\/c\/([^\/?#]+)/);
-      if (mC) return mC[1];
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 function getVideoThumbnail(videoInfo: { platform: string; id: string }): string {
   switch (videoInfo.platform) {
     case 'youtube':
-      return `https://img.youtube.com/vi/${videoInfo.id}/hqdefault.jpg`;
+      return `https://img.youtube.com/vi/${videoInfo.id}/maxresdefault.jpg`;
     case 'tiktok':
       // Try to get TikTok thumbnail - this may not always work due to TikTok's restrictions
       return `https://www.tiktok.com/oembed?url=https://www.tiktok.com/@user/video/${videoInfo.id}`;
@@ -218,7 +182,7 @@ Make it clear that this is a placeholder and the user should manually review and
 
   // For non-image URLs (Instagram/TikTok), make a text-only request
   const requestBody = isActualImage ? {
-    model: 'gpt-4o-mini',
+    model: 'gpt-4o',
     messages: [
       {
         role: 'user',
@@ -231,7 +195,7 @@ Make it clear that this is a placeholder and the user should manually review and
     max_tokens: 1500,
     temperature: 0.7,
   } : {
-    model: 'gpt-4o-mini',
+    model: 'gpt-4o',
     messages: [
       {
         role: 'user',
