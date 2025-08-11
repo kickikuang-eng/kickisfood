@@ -48,6 +48,7 @@ const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
   const [chefFilter, setChefFilter] = useState<string>("");
   const [chefOpen, setChefOpen] = useState(false);
   const [chefQuery, setChefQuery] = useState("");
+  const [sortBy, setSortBy] = useState<string>("newest");
 
   const difficulties = Array.from(new Set(recipes.map(r => r.difficulty).filter(Boolean))) as string[];
   const cuisines = Array.from(new Set(recipes.map(r => r.cuisine).filter(Boolean))) as string[];
@@ -139,6 +140,30 @@ const filteredRecipes = recipes.filter((recipe) => {
   return matchesSearch && matchesDifficulty && matchesCuisine && matchesChef && matchesTime;
 });
 
+  const sortedRecipes = [...filteredRecipes].sort((a, b) => {
+    switch (sortBy) {
+      case 'oldest':
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      case 'title-asc':
+        return a.title.localeCompare(b.title);
+      case 'title-desc':
+        return b.title.localeCompare(a.title);
+      case 'time-asc': {
+        const ta = (a.prep_time || 0) + (a.cook_time || 0);
+        const tb = (b.prep_time || 0) + (b.cook_time || 0);
+        return ta - tb;
+      }
+      case 'time-desc': {
+        const ta = (a.prep_time || 0) + (a.cook_time || 0);
+        const tb = (b.prep_time || 0) + (b.cook_time || 0);
+        return tb - ta;
+      }
+      case 'newest':
+      default:
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }
+  });
+
   const formatTime = (minutes: number | null) => {
     if (!minutes) return null;
     if (minutes < 60) return `${minutes}m`;
@@ -179,7 +204,7 @@ const filteredRecipes = recipes.filter((recipe) => {
     />
   </div>
 
-<div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+<div className="grid grid-cols-1 md:grid-cols-6 gap-4">
     <div className="flex flex-col gap-2">
       <Label htmlFor="difficulty">Difficulty</Label>
       <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
@@ -278,6 +303,23 @@ const filteredRecipes = recipes.filter((recipe) => {
       <div className="text-xs text-muted-foreground">Filter by prep + cook time</div>
     </div>
 
+    <div className="flex flex-col gap-2">
+      <Label htmlFor="sort">Sort</Label>
+      <Select value={sortBy} onValueChange={setSortBy}>
+        <SelectTrigger id="sort">
+          <SelectValue placeholder="Sort" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="newest">Newest</SelectItem>
+          <SelectItem value="oldest">Oldest</SelectItem>
+          <SelectItem value="title-asc">Title A–Z</SelectItem>
+          <SelectItem value="title-desc">Title Z–A</SelectItem>
+          <SelectItem value="time-asc">Total time ↑</SelectItem>
+          <SelectItem value="time-desc">Total time ↓</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+
     <div className="flex items-end">
       <Button variant="outline" onClick={() => { setDifficultyFilter("all"); setCuisineFilter("all"); setChefFilter(""); setChefQuery(""); setMaxTime(null); }}>
         Clear filters
@@ -340,7 +382,7 @@ const filteredRecipes = recipes.filter((recipe) => {
         {/* Recipe Grid */}
         {!isLoading && filteredRecipes.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredRecipes.map((recipe) => (
+            {sortedRecipes.map((recipe) => (
               <Card 
                 key={recipe.id} 
                 className="relative group hover:shadow-lg transition-shadow cursor-pointer"
