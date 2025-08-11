@@ -14,9 +14,10 @@ type ExtractResponse = {
 };
 
 function extractPlatform(url: string): "youtube" | "tiktok" | "instagram" | "unknown" {
-  if (/youtube\.com\/(watch\?v=|embed\/)||youtu\.be\//.test(url)) return "youtube";
-  if (/tiktok\.com\//.test(url)) return "tiktok";
-  if (/instagram\.com\//.test(url)) return "instagram";
+  const u = url.toLowerCase();
+  if (/(youtube\.com\/(watch\?v=|embed\/)|youtu\.be\//i.test(u)) return "youtube";
+  if (/tiktok\.com\//i.test(u)) return "tiktok";
+  if (/instagram\.com\//i.test(u)) return "instagram";
   return "unknown";
 }
 
