@@ -70,13 +70,41 @@ const [manualForm, setManualForm] = useState<ManualRecipeForm>({
 
 setIsLoading(true);
     try {
-      // Try richer Firecrawl + Gemini extractor first
+      // Detect platform from URL
+      let platform: 'youtube' | 'tiktok' | 'instagram' | 'unknown' = 'unknown';
+      try {
+        const u = new URL(url);
+        const h = u.hostname;
+        if (/youtube\.com|youtu\.be/i.test(h)) platform = 'youtube';
+        else if (/tiktok\.com/i.test(h)) platform = 'tiktok';
+        else if (/instagram\.com/i.test(h)) platform = 'instagram';
+      } catch {}
+
+      if (platform === 'youtube') {
+        // Go straight to the OpenAI+YouTube extractor
+        const yt = await supabase.functions.invoke('extract-recipe-from-video', {
+          body: { videoUrl: url, userId: user.id }
+        });
+
+        if (yt.error || !yt.data?.success) {
+          throw new Error(yt.error?.message || 'Failed to extract recipe from YouTube link');
+        }
+
+        toast({
+          title: 'Success!',
+          description: yt.data.message || 'Recipe extracted and saved successfully!',
+        });
+        resetDialog();
+        return;
+      }
+
+      // Try richer Firecrawl + Gemini extractor first (TikTok/Instagram/others)
       const { data, error } = await supabase.functions.invoke('extract-recipe-from-social', {
         body: { videoUrl: url, userId: user.id }
       });
 
       if (error || !data?.success) {
-        // Fallback to OpenAI-based extractor (better for YouTube)
+        // Fallback to OpenAI-based extractor (works for YouTube; placeholder for IG/TikTok)
         const fb = await supabase.functions.invoke('extract-recipe-from-video', {
           body: { videoUrl: url, userId: user.id }
         });
@@ -87,27 +115,28 @@ setIsLoading(true);
         }
 
         toast({
-          title: "Imported via fallback",
-          description: fb.data.message || "Recipe extracted and saved successfully!",
+          title: platform === 'instagram' ? 'Imported (limited)' : 'Imported via fallback',
+          description: fb.data.message || 'Recipe extracted and saved successfully!',
         });
         resetDialog();
         return;
       }
 
       toast({
-        title: "Success!",
-        description: data.message || "Recipe extracted and saved successfully!",
+        title: 'Success!',
+        description: data.message || 'Recipe extracted and saved successfully!',
       });
       resetDialog();
     } catch (error: any) {
       console.error('Extraction error:', error);
-      const isIgRestriction = /Firecrawl error: 403/i.test(error?.message || '');
+      const msg = error?.message || 'Failed to extract recipe';
+      const isIgRestriction = /Firecrawl error:\s*403/i.test(msg);
       toast({
-        title: isIgRestriction ? "Instagram scraping not enabled" : "Error",
+        title: isIgRestriction ? 'Instagram scraping not enabled' : 'Error',
         description: isIgRestriction
-          ? "Your Firecrawl account cannot scrape Instagram. Try YouTube links or enable IG support in Firecrawl."
-          : (error.message || "Failed to extract recipe from video"),
-        variant: "destructive",
+          ? 'Your Firecrawl plan cannot scrape Instagram. Use YouTube links or enable IG in Firecrawl.'
+          : msg,
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
