@@ -68,8 +68,43 @@ const [manualForm, setManualForm] = useState<ManualRecipeForm>({
       return;
     }
 
-setIsLoading(true);
+    setIsLoading(true);
     try {
+      const isYouTube = /youtube\.com\/(watch\?v=|embed\/|shorts\/)|youtu\.be\//.test(url);
+
+      if (isYouTube) {
+        // Primary: OpenAI-based extractor for YouTube
+        const { data, error } = await supabase.functions.invoke('extract-recipe-from-video', {
+          body: { videoUrl: url, userId: user.id }
+        });
+
+        if (!error && data?.success) {
+          toast({
+            title: "Success!",
+            description: data.message || `"${data.recipe.title}" has been added to your library.`,
+          });
+          resetDialog();
+          return;
+        }
+
+        // Fallback: Gemini-based extractor
+        const { data: gData, error: gError } = await supabase.functions.invoke('extract-recipe-with-gemini', {
+          body: { videoUrl: url, userId: user.id }
+        });
+
+        if (!gError && gData?.success) {
+          toast({
+            title: "Success!",
+            description: gData.message || `"${gData.recipe.title}" has been added to your library.`,
+          });
+          resetDialog();
+          return;
+        }
+
+        throw new Error(gError?.message || data?.error || error?.message || 'Failed to extract recipe');
+      }
+
+      // Instagram/TikTok and others: use social extractor
       const { data, error } = await supabase.functions.invoke('extract-recipe-from-social', {
         body: { videoUrl: url, userId: user.id }
       });
