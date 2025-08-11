@@ -68,9 +68,9 @@ const [manualForm, setManualForm] = useState<ManualRecipeForm>({
       return;
     }
 
-    setIsLoading(true);
+setIsLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('extract-recipe-from-video', {
+      const { data, error } = await supabase.functions.invoke('extract-recipe-from-social', {
         body: { videoUrl: url, userId: user.id }
       });
 
