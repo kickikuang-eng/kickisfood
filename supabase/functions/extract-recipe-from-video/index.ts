@@ -153,7 +153,7 @@ function extractAuthorFromUrl(url: string): string | null {
 function getVideoThumbnail(videoInfo: { platform: string; id: string }): string {
   switch (videoInfo.platform) {
     case 'youtube':
-      return `https://img.youtube.com/vi/${videoInfo.id}/maxresdefault.jpg`;
+      return `https://img.youtube.com/vi/${videoInfo.id}/hqdefault.jpg`;
     case 'tiktok':
       // Try to get TikTok thumbnail - this may not always work due to TikTok's restrictions
       return `https://www.tiktok.com/oembed?url=https://www.tiktok.com/@user/video/${videoInfo.id}`;
@@ -213,7 +213,7 @@ Make it clear that this is a placeholder and the user should manually review and
 
   // For non-image URLs (Instagram/TikTok), make a text-only request
   const requestBody = isActualImage ? {
-    model: 'gpt-4o',
+    model: 'gpt-4o-mini',
     messages: [
       {
         role: 'user',
@@ -226,7 +226,7 @@ Make it clear that this is a placeholder and the user should manually review and
     max_tokens: 1500,
     temperature: 0.7,
   } : {
-    model: 'gpt-4o',
+    model: 'gpt-4o-mini',
     messages: [
       {
         role: 'user',
