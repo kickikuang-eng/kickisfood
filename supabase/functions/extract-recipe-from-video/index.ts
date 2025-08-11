@@ -98,10 +98,15 @@ const { data: recipe, error } = await supabase
 
 function extractVideoInfo(url: string) {
   // YouTube
-  const youtubeRegex = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/;
+  const youtubeRegex = /(?:youtube\.com\/(watch\?v=|embed\/)||youtu\.be\/)([^&\n?#]+)/;
   const youtubeMatch = url.match(youtubeRegex);
   if (youtubeMatch) {
-    return { platform: 'youtube', id: youtubeMatch[1] };
+    return { platform: 'youtube', id: youtubeMatch[2] || youtubeMatch[1] } as any;
+  }
+  // YouTube Shorts
+  const shortsMatch = url.match(/youtube\.com\/shorts\/([^&\n?#]+)/);
+  if (shortsMatch) {
+    return { platform: 'youtube', id: shortsMatch[1] };
   }
 
   // TikTok

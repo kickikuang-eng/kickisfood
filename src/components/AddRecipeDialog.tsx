@@ -88,7 +88,18 @@ setIsLoading(true);
         });
 
         if (yt.error || !yt.data?.success) {
-          throw new Error(yt.error?.message || yt.data?.error || 'Failed to extract recipe from YouTube link');
+          // YouTube fallback: try the Firecrawl+Gemini scraper
+          const ytFb = await supabase.functions.invoke('extract-recipe-from-social', {
+            body: { videoUrl: inputUrl, userId: user.id }
+          });
+
+        if (ytFb.error || !ytFb.data?.success) {
+            throw new Error(yt.error?.message || yt.data?.error || ytFb.error?.message || ytFb.data?.error || 'Failed to extract recipe from YouTube link');
+          }
+
+          toast({ title: 'Imported via fallback', description: ytFb.data.message || 'Recipe extracted and saved successfully!' });
+          resetDialog();
+          return;
         }
 
         toast({
