@@ -36,6 +36,7 @@ interface Recipe {
   servings: number | null;
   difficulty: string | null;
   cuisine: string | null;
+  chef: string | null;
   ingredients: string[] | null;
   instructions: string[] | null;
   image_url: string | null;
@@ -158,7 +159,7 @@ const RecipeDetail = () => {
     try {
       const { data, error } = await supabase
         .from('recipes')
-        .update({
+.update({
           title: editForm.title,
           description: editForm.description,
           ingredients: editForm.ingredients,
@@ -168,6 +169,7 @@ const RecipeDetail = () => {
           servings: editForm.servings,
           difficulty: editForm.difficulty,
           cuisine: editForm.cuisine,
+          chef: editForm.chef,
           image_url: editForm.image_url,
           source_url: editForm.source_url,
         })
@@ -445,22 +447,30 @@ const RecipeDetail = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="col-span-2">
-                    <label className="text-sm font-medium mb-1 block">Cuisine</label>
-                    <Input
-                      value={editForm.cuisine || ''}
-                      onChange={(e) => setEditForm({ ...editForm, cuisine: e.target.value })}
-                      placeholder="Italian, Mexican, etc."
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="text-sm font-medium mb-1 block">Source URL</label>
-                    <Input
-                      value={editForm.source_url || ''}
-                      onChange={(e) => setEditForm({ ...editForm, source_url: e.target.value })}
-                      placeholder="https://..."
-                    />
-                  </div>
+<div className="col-span-2">
+  <label className="text-sm font-medium mb-1 block">Cuisine</label>
+  <Input
+    value={editForm.cuisine || ''}
+    onChange={(e) => setEditForm({ ...editForm, cuisine: e.target.value })}
+    placeholder="Italian, Mexican, etc."
+  />
+</div>
+<div className="col-span-2">
+  <label className="text-sm font-medium mb-1 block">Chef</label>
+  <Input
+    value={editForm.chef || ''}
+    onChange={(e) => setEditForm({ ...editForm, chef: e.target.value })}
+    placeholder="e.g., Gordon Ramsay"
+  />
+</div>
+<div className="col-span-2">
+  <label className="text-sm font-medium mb-1 block">Source URL</label>
+  <Input
+    value={editForm.source_url || ''}
+    onChange={(e) => setEditForm({ ...editForm, source_url: e.target.value })}
+    placeholder="https://..."
+  />
+</div>
                 </div>
               ) : (
                 <>
@@ -485,19 +495,25 @@ const RecipeDetail = () => {
                       <span>{recipe.servings}</span>
                     </div>
                   )}
-                  {recipe.cuisine && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Globe className="w-4 h-4 text-emerald-600" />
-                      <span className="font-medium">Cuisine:</span>
-                      <Badge variant="secondary">{recipe.cuisine}</Badge>
-                    </div>
-                  )}
-                  {recipe.difficulty && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="font-medium">Difficulty:</span>
-                      <Badge variant="outline">{recipe.difficulty}</Badge>
-                    </div>
-                  )}
+{recipe.cuisine && (
+  <div className="flex items-center gap-2 text-sm">
+    <Globe className="w-4 h-4 text-emerald-600" />
+    <span className="font-medium">Cuisine:</span>
+    <Badge variant="secondary">{recipe.cuisine}</Badge>
+  </div>
+)}
+{recipe.chef && (
+  <div className="flex items-center gap-2 text-sm">
+    <span className="font-medium">Chef:</span>
+    <Badge variant="secondary">{recipe.chef}</Badge>
+  </div>
+)}
+{recipe.difficulty && (
+  <div className="flex items-center gap-2 text-sm">
+    <span className="font-medium">Difficulty:</span>
+    <Badge variant="outline">{recipe.difficulty}</Badge>
+  </div>
+)}
                 </>
               )}
             </div>
