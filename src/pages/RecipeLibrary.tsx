@@ -224,19 +224,19 @@ const filteredRecipes = recipes.filter((recipe) => {
         >
           All
         </CommandItem>
-        {chefs.map((c) => (
-          <CommandItem
-            key={c}
-            value={c}
-            onSelect={(val) => {
-              setChefFilter(val);
-              setChefQuery(val);
-              setChefOpen(false);
-            }}
-          >
-            {c}
-          </CommandItem>
-        ))}
+{chefs.map((c) => (
+  <CommandItem
+    key={c ?? "unknown"}
+    value={String(c ?? "")}
+    onSelect={(val) => {
+      setChefFilter(val);
+      setChefQuery(val);
+      setChefOpen(false);
+    }}
+  >
+    {c}
+  </CommandItem>
+))}
       </CommandGroup>
     </CommandList>
   </Command>
