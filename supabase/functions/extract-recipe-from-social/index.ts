@@ -211,16 +211,72 @@ serve(async (req) => {
       global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
     });
 
-    // Scrape
-    const scraped = await scrapeWithFirecrawl(videoUrl);
-    const ogImage = parseOgImageFromHtml(scraped.html);
+    // Scrape or fallback (Instagram oEmbed)
+    let scraped: { markdown?: string; html?: string; finalUrl?: string } | null = null;
+    let ogImage: string | null = null;
+    let igOembed: any | null = null;
+
+    if (platform === "instagram") {
+      try {
+        const appId = Deno.env.get("FACEBOOK_APP_ID");
+        const appSecret = Deno.env.get("FACEBOOK_APP_SECRET");
+        if (appId && appSecret) {
+          const accessToken = `${appId}|${appSecret}`;
+          const oembedUrl = `https://graph.facebook.com/v19.0/instagram_oembed?url=${encodeURIComponent(videoUrl)}&access_token=${accessToken}&omitscript=true`;
+          const oRes = await fetch(oembedUrl);
+          if (oRes.ok) {
+            igOembed = await oRes.json();
+            ogImage = igOembed?.thumbnail_url || null;
+          } else {
+            console.warn("Instagram oEmbed request failed", oRes.status, await oRes.text());
+          }
+        } else {
+          console.warn("FACEBOOK_APP_ID or FACEBOOK_APP_SECRET is not set; skipping oEmbed.");
+        }
+      } catch (e) {
+        console.warn("oEmbed fetch error", e);
+      }
+    }
+
+    if (!igOembed) {
+      try {
+        scraped = await scrapeWithFirecrawl(videoUrl);
+        ogImage = parseOgImageFromHtml(scraped.html);
+      } catch (e) {
+        console.warn("Firecrawl failed; attempting Instagram oEmbed fallback if applicable", (e as any)?.message || e);
+        if (platform === "instagram" && !igOembed) {
+          try {
+            const appId = Deno.env.get("FACEBOOK_APP_ID");
+            const appSecret = Deno.env.get("FACEBOOK_APP_SECRET");
+            if (appId && appSecret) {
+              const accessToken = `${appId}|${appSecret}`;
+              const oembedUrl = `https://graph.facebook.com/v19.0/instagram_oembed?url=${encodeURIComponent(videoUrl)}&access_token=${accessToken}&omitscript=true`;
+              const oRes2 = await fetch(oembedUrl);
+              if (oRes2.ok) {
+                igOembed = await oRes2.json();
+                ogImage = igOembed?.thumbnail_url || null;
+              }
+            }
+          } catch {}
+        } else {
+          throw e;
+        }
+      }
+    }
 
     // Analyze
-const prompt = buildPrompt(videoUrl, platform, scraped.markdown, scraped.html);
-const raw = await analyzeWithGemini(prompt);
-const authorFromUrl = extractAuthorFromUrl(videoUrl);
-const normalized = normalizeRecipe(raw, ogImage, authorFromUrl);
-
+    let prompt: string;
+    if (igOembed) {
+      const caption = igOembed?.title || "";
+      const authorName = igOembed?.author_name || extractAuthorFromUrl(videoUrl) || "";
+      const md = `Instagram oEmbed\nCaption: ${caption}\nAuthor: ${authorName}\nThumbnail: ${ogImage || ""}`;
+      prompt = buildPrompt(videoUrl, platform, md, undefined);
+    } else {
+      prompt = buildPrompt(videoUrl, platform, scraped?.markdown, scraped?.html);
+    }
+    const raw = await analyzeWithGemini(prompt);
+    const authorFromUrl = (igOembed?.author_name as string | undefined) || extractAuthorFromUrl(videoUrl);
+    const normalized = normalizeRecipe(raw, ogImage, authorFromUrl);
     // Insert
 const insertPayload = {
   user_id: userId,
