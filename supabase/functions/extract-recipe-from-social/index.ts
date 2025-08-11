@@ -238,29 +238,14 @@ serve(async (req) => {
       }
     }
 
-    if (!igOembed) {
+    // For Instagram, skip Firecrawl entirely to avoid 403 blocks
+    if (platform !== "instagram") {
       try {
         scraped = await scrapeWithFirecrawl(videoUrl);
         ogImage = parseOgImageFromHtml(scraped.html);
       } catch (e) {
-        console.warn("Firecrawl failed; attempting Instagram oEmbed fallback if applicable", (e as any)?.message || e);
-        if (platform === "instagram" && !igOembed) {
-          try {
-            const appId = Deno.env.get("FACEBOOK_APP_ID");
-            const appSecret = Deno.env.get("FACEBOOK_APP_SECRET");
-            if (appId && appSecret) {
-              const accessToken = `${appId}|${appSecret}`;
-              const oembedUrl = `https://graph.facebook.com/v19.0/instagram_oembed?url=${encodeURIComponent(videoUrl)}&access_token=${accessToken}&omitscript=true`;
-              const oRes2 = await fetch(oembedUrl);
-              if (oRes2.ok) {
-                igOembed = await oRes2.json();
-                ogImage = igOembed?.thumbnail_url || null;
-              }
-            }
-          } catch {}
-        } else {
-          throw e;
-        }
+        // Non-Instagram URLs should surface scrape errors
+        throw e;
       }
     }
 
