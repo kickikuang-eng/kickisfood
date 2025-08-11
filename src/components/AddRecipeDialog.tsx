@@ -70,25 +70,43 @@ const [manualForm, setManualForm] = useState<ManualRecipeForm>({
 
 setIsLoading(true);
     try {
+      // Try richer Firecrawl + Gemini extractor first
       const { data, error } = await supabase.functions.invoke('extract-recipe-from-social', {
         body: { videoUrl: url, userId: user.id }
       });
 
-      if (error) throw error;
+      if (error || !data?.success) {
+        // Fallback to OpenAI-based extractor (better for YouTube)
+        const fb = await supabase.functions.invoke('extract-recipe-from-video', {
+          body: { videoUrl: url, userId: user.id }
+        });
 
-      if (data.success) {
+        if (fb.error || !fb.data?.success) {
+          const msg = data?.error || error?.message || fb.error?.message || 'Failed to extract recipe';
+          throw new Error(msg);
+        }
+
         toast({
-          title: "Success!",
-          description: data.message || "Recipe extracted and saved successfully!",
+          title: "Imported via fallback",
+          description: fb.data.message || "Recipe extracted and saved successfully!",
         });
         resetDialog();
-      } else {
-        throw new Error(data.error || "Failed to extract recipe");
+        return;
       }
-    } catch (error: any) {
+
       toast({
-        title: "Error",
-        description: error.message || "Failed to extract recipe from video",
+        title: "Success!",
+        description: data.message || "Recipe extracted and saved successfully!",
+      });
+      resetDialog();
+    } catch (error: any) {
+      console.error('Extraction error:', error);
+      const isIgRestriction = /Firecrawl error: 403/i.test(error?.message || '');
+      toast({
+        title: isIgRestriction ? "Instagram scraping not enabled" : "Error",
+        description: isIgRestriction
+          ? "Your Firecrawl account cannot scrape Instagram. Try YouTube links or enable IG support in Firecrawl."
+          : (error.message || "Failed to extract recipe from video"),
         variant: "destructive",
       });
     } finally {
