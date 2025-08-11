@@ -15,7 +15,7 @@ type ExtractResponse = {
 
 function extractPlatform(url: string): "youtube" | "tiktok" | "instagram" | "unknown" {
   const u = url.toLowerCase();
-  if (/(youtube\.com\/(watch\?v=|embed\/)|youtu\.be\//i.test(u)) return "youtube";
+  if (/youtu\.be\//i.test(u) || /youtube\.com\/(watch\?v=|embed\/|shorts\/)\/?.*/i.test(u)) return "youtube";
   if (/tiktok\.com\//i.test(u)) return "tiktok";
   if (/instagram\.com\//i.test(u)) return "instagram";
   return "unknown";
