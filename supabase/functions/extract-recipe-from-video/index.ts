@@ -84,13 +84,13 @@ const { data: recipe, error } = await supabase
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in extract-recipe-from-video function:', error);
     return new Response(JSON.stringify({ 
       error: error.message || 'Failed to extract recipe from video',
       success: false 
     }), {
-      status: 500,
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

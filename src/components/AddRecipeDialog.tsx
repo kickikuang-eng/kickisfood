@@ -70,10 +70,11 @@ const [manualForm, setManualForm] = useState<ManualRecipeForm>({
 
 setIsLoading(true);
     try {
+      const inputUrl = url.trim();
       // Detect platform from URL
       let platform: 'youtube' | 'tiktok' | 'instagram' | 'unknown' = 'unknown';
       try {
-        const u = new URL(url);
+        const u = new URL(inputUrl);
         const h = u.hostname;
         if (/youtube\.com|youtu\.be/i.test(h)) platform = 'youtube';
         else if (/tiktok\.com/i.test(h)) platform = 'tiktok';
@@ -83,11 +84,11 @@ setIsLoading(true);
       if (platform === 'youtube') {
         // Go straight to the OpenAI+YouTube extractor
         const yt = await supabase.functions.invoke('extract-recipe-from-video', {
-          body: { videoUrl: url, userId: user.id }
+          body: { videoUrl: inputUrl, userId: user.id }
         });
 
         if (yt.error || !yt.data?.success) {
-          throw new Error(yt.error?.message || 'Failed to extract recipe from YouTube link');
+          throw new Error(yt.error?.message || yt.data?.error || 'Failed to extract recipe from YouTube link');
         }
 
         toast({
@@ -100,17 +101,17 @@ setIsLoading(true);
 
       // Try richer Firecrawl + Gemini extractor first (TikTok/Instagram/others)
       const { data, error } = await supabase.functions.invoke('extract-recipe-from-social', {
-        body: { videoUrl: url, userId: user.id }
+        body: { videoUrl: inputUrl, userId: user.id }
       });
 
       if (error || !data?.success) {
         // Fallback to OpenAI-based extractor (works for YouTube; placeholder for IG/TikTok)
         const fb = await supabase.functions.invoke('extract-recipe-from-video', {
-          body: { videoUrl: url, userId: user.id }
+          body: { videoUrl: inputUrl, userId: user.id }
         });
 
         if (fb.error || !fb.data?.success) {
-          const msg = data?.error || error?.message || fb.error?.message || 'Failed to extract recipe';
+          const msg = data?.error || error?.message || fb.error?.message || fb.data?.error || 'Failed to extract recipe';
           throw new Error(msg);
         }
 
