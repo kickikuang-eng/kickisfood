@@ -45,27 +45,29 @@ serve(async (req) => {
     const recipeData = await analyzeVideoForRecipe(imageUrl, videoUrl);
     console.log('Recipe analysis completed:', recipeData);
 
-    // Save to Supabase
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    
-    const { data: recipe, error } = await supabase
-      .from('recipes')
-      .insert({
-        user_id: userId,
-        title: recipeData.title,
-        description: recipeData.description,
-        ingredients: recipeData.ingredients,
-        instructions: recipeData.instructions,
-        prep_time: recipeData.prep_time,
-        cook_time: recipeData.cook_time,
-        servings: recipeData.servings,
-        difficulty: recipeData.difficulty,
-        cuisine: recipeData.cuisine,
-        source_url: videoUrl,
-        image_url: imageUrl
-      })
-      .select()
-      .single();
+// Save to Supabase
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const chef = extractAuthorFromUrl(videoUrl);
+
+const { data: recipe, error } = await supabase
+  .from('recipes')
+  .insert({
+    user_id: userId,
+    title: recipeData.title,
+    description: recipeData.description,
+    ingredients: recipeData.ingredients,
+    instructions: recipeData.instructions,
+    prep_time: recipeData.prep_time,
+    cook_time: recipeData.cook_time,
+    servings: recipeData.servings,
+    difficulty: recipeData.difficulty,
+    cuisine: recipeData.cuisine,
+    source_url: videoUrl,
+    image_url: imageUrl,
+    chef: chef || null,
+  })
+  .select()
+  .single();
 
     if (error) {
       console.error('Error saving recipe:', error);
@@ -117,6 +119,35 @@ function extractVideoInfo(url: string) {
   }
 
   return null;
+}
+
+function extractAuthorFromUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    const host = u.hostname;
+    const path = u.pathname;
+
+    if (host.includes('tiktok.com')) {
+      const m = path.match(/\/(@[\w.-]+)\/video\//);
+      if (m) return m[1];
+    }
+
+    if (host.includes('instagram.com')) {
+      const m = path.match(/^\/([^\/?#]+)\/(reel|p)\//);
+      if (m && m[1] && !['reel', 'p'].includes(m[1])) return m[1];
+    }
+
+    if (host.includes('youtube.com')) {
+      const mHandle = path.match(/\/(@[^\/?#]+)/);
+      if (mHandle) return mHandle[1];
+      const mC = path.match(/\/c\/([^\/?#]+)/);
+      if (mC) return mC[1];
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function getVideoThumbnail(videoInfo: { platform: string; id: string }): string {
