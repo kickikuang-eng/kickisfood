@@ -82,30 +82,26 @@ setIsLoading(true);
       } catch {}
 
       if (platform === 'youtube') {
-        // Go straight to the OpenAI+YouTube extractor
-        const yt = await supabase.functions.invoke('extract-recipe-from-video', {
+        // Prefer Firecrawl+Gemini on YouTube (scrapes page text reliably), then fallback to OpenAI Vision
+        const ytScrape = await supabase.functions.invoke('extract-recipe-from-social', {
           body: { videoUrl: inputUrl, userId: user.id }
         });
 
-        if (yt.error || !yt.data?.success) {
-          // YouTube fallback: try the Firecrawl+Gemini scraper
-          const ytFb = await supabase.functions.invoke('extract-recipe-from-social', {
+        if (ytScrape.error || !ytScrape.data?.success) {
+          const ytVision = await supabase.functions.invoke('extract-recipe-from-video', {
             body: { videoUrl: inputUrl, userId: user.id }
           });
 
-        if (ytFb.error || !ytFb.data?.success) {
-            throw new Error(yt.error?.message || yt.data?.error || ytFb.error?.message || ytFb.data?.error || 'Failed to extract recipe from YouTube link');
+          if (ytVision.error || !ytVision.data?.success) {
+            throw new Error(ytScrape.data?.error || ytScrape.error?.message || ytVision.error?.message || ytVision.data?.error || 'Failed to extract recipe from YouTube link');
           }
 
-          toast({ title: 'Imported via fallback', description: ytFb.data.message || 'Recipe extracted and saved successfully!' });
+          toast({ title: 'Imported via Vision fallback', description: ytVision.data.message || 'Recipe extracted and saved successfully!' });
           resetDialog();
           return;
         }
 
-        toast({
-          title: 'Success!',
-          description: yt.data.message || 'Recipe extracted and saved successfully!',
-        });
+        toast({ title: 'Success!', description: ytScrape.data.message || 'Recipe extracted and saved successfully!' });
         resetDialog();
         return;
       }
