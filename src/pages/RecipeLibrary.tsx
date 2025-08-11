@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
 
 interface Recipe {
@@ -198,47 +198,49 @@ const filteredRecipes = recipes.filter((recipe) => {
             <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[240px] p-0 z-50 bg-background">
-          <Command>
-            <CommandInput
-              placeholder="Type a chef..."
-              value={chefQuery}
-              onValueChange={setChefQuery}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  setChefFilter(chefQuery);
-                  setChefOpen(false);
-                }
-              }}
-            />
-            <CommandEmpty>No chefs found.</CommandEmpty>
-            <CommandGroup>
-              <CommandItem
-                value="all"
-                onSelect={() => {
-                  setChefFilter("");
-                  setChefQuery("");
-                  setChefOpen(false);
-                }}
-              >
-                All
-              </CommandItem>
-              {chefs.map((c) => (
-                <CommandItem
-                  key={c}
-                  value={c}
-                  onSelect={(val) => {
-                    setChefFilter(val);
-                    setChefQuery(val);
-                    setChefOpen(false);
-                  }}
-                >
-                  {c}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </Command>
-        </PopoverContent>
+<PopoverContent className="w-[240px] p-0 z-50 bg-background">
+  <Command>
+    <CommandInput
+      placeholder="Type a chef..."
+      value={chefQuery}
+      onValueChange={setChefQuery}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          setChefFilter(chefQuery);
+          setChefOpen(false);
+        }
+      }}
+    />
+    <CommandList>
+      <CommandEmpty>No chefs found.</CommandEmpty>
+      <CommandGroup>
+        <CommandItem
+          value="all"
+          onSelect={() => {
+            setChefFilter("");
+            setChefQuery("");
+            setChefOpen(false);
+          }}
+        >
+          All
+        </CommandItem>
+        {chefs.map((c) => (
+          <CommandItem
+            key={c}
+            value={c}
+            onSelect={(val) => {
+              setChefFilter(val);
+              setChefQuery(val);
+              setChefOpen(false);
+            }}
+          >
+            {c}
+          </CommandItem>
+        ))}
+      </CommandGroup>
+    </CommandList>
+  </Command>
+</PopoverContent>
       </Popover>
     </div>
 
