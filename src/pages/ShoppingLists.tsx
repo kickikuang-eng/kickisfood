@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Trash2 } from "lucide-react";
 
 interface ShoppingList { id: string; name: string }
 interface ShoppingItem {
@@ -154,6 +155,22 @@ const ShoppingLists = () => {
     if (error) {
       toast({ title: "Error", description: "Failed to update items", variant: "destructive" });
     }
+};
+
+  const deleteGroup = async (ids: string[]) => {
+    if (!ids.length) return;
+    const prev = items;
+    setItems(prev.filter((i) => !ids.includes(i.id)));
+    const { error } = await supabase
+      .from("shopping_list_items")
+      .delete()
+      .in("id", ids);
+    if (error) {
+      setItems(prev);
+      toast({ title: "Error", description: "Failed to delete items", variant: "destructive" });
+    } else {
+      toast({ title: "Removed", description: "Item removed from list" });
+    }
   };
 
   return (
@@ -221,6 +238,14 @@ const ShoppingLists = () => {
                         {g.name}
                         {g.count > 1 && <span className="text-muted-foreground"> ×{g.count}</span>}
                       </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Delete ${g.name}`}
+                        onClick={() => deleteGroup(g.ids)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </li>
                   ))
                 )}
