@@ -27,6 +27,9 @@ import {
   Plus,
   Minus
 } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageProvider";
+import { translateTexts } from "@/lib/translate";
+import { convertIngredientUnitsToSwedish } from "@/lib/units";
 
 interface Recipe {
   id: string;
@@ -54,6 +57,12 @@ const RecipeDetail = () => {
   const { toast } = useToast();
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const { lang } = useLanguage();
+
+  const [svTitle, setSvTitle] = useState<string | null>(null);
+  const [svDesc, setSvDesc] = useState<string | null>(null);
+  const [svIngredients, setSvIngredients] = useState<string[] | null>(null);
+  const [svInstructions, setSvInstructions] = useState<string[] | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -112,6 +121,36 @@ const RecipeDetail = () => {
     }
   };
 
+  // Build Swedish display when needed
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!recipe || isEditing || lang !== 'sv') {
+        setSvTitle(null);
+        setSvDesc(null);
+        setSvIngredients(null);
+        setSvInstructions(null);
+        return;
+      }
+      const [tTitle, tDesc] = await translateTexts(
+        [recipe.title, recipe.description || ""],
+        'sv',
+        { mode: 'recipe' }
+      );
+      const ing = (recipe.ingredients || []).map((i) => convertIngredientUnitsToSwedish(i));
+      const ins = recipe.instructions || [];
+      const [tIngs, tIns] = await Promise.all([
+        translateTexts(ing, 'sv', { mode: 'recipe', hint: 'ingredient' }),
+        translateTexts(ins, 'sv', { mode: 'recipe', hint: 'instruction' }),
+      ]);
+      if (!mounted) return;
+      setSvTitle(tTitle || recipe.title);
+      setSvDesc(tDesc || recipe.description || null);
+      setSvIngredients(tIngs);
+      setSvInstructions(tIns);
+    })();
+    return () => { mounted = false; };
+  }, [lang, recipe, isEditing]);
   const handleDelete = async () => {
     if (!recipe || !window.confirm('Are you sure you want to delete this recipe?')) {
       return;
@@ -339,9 +378,9 @@ const RecipeDetail = () => {
                   </div>
                 ) : (
                   <>
-                    <CardTitle className="text-3xl mb-2">{recipe.title}</CardTitle>
+                    <CardTitle className="text-3xl mb-2">{lang === 'sv' && !isEditing ? (svTitle ?? recipe.title) : recipe.title}</CardTitle>
                     {recipe.description && (
-                      <p className="text-muted-foreground text-lg">{recipe.description}</p>
+                      <p className="text-muted-foreground text-lg">{lang === 'sv' && !isEditing ? (svDesc ?? recipe.description) : recipe.description}</p>
                     )}
                   </>
                 )}
@@ -579,7 +618,7 @@ const RecipeDetail = () => {
                 <>
                   {recipe.ingredients && recipe.ingredients.length > 0 ? (
                     <ul className="space-y-2">
-                      {recipe.ingredients.map((ingredient, index) => (
+                      {(lang === 'sv' && !isEditing ? (svIngredients || recipe.ingredients) : recipe.ingredients).map((ingredient, index) => (
                         <li key={index} className="flex items-start gap-3">
                           <div className="w-2 h-2 bg-emerald-600 rounded-full mt-2 flex-shrink-0"></div>
                           <span>{ingredient}</span>
@@ -638,7 +677,7 @@ const RecipeDetail = () => {
                 <>
                   {recipe.instructions && recipe.instructions.length > 0 ? (
                     <ol className="space-y-4">
-                      {recipe.instructions.map((instruction, index) => (
+                      {(lang === 'sv' && !isEditing ? (svInstructions || recipe.instructions) : recipe.instructions).map((instruction, index) => (
                         <li key={index} className="flex gap-4">
                           <span className="flex-shrink-0 w-6 h-6 bg-emerald-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
                             {index + 1}

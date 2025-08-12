@@ -15,8 +15,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-
-
 interface Recipe {
   id: string;
   title: string;
@@ -42,7 +40,11 @@ const RecipeLibrary = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
-const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
+  const { lang } = useLanguage();
+  const [titleMap, setTitleMap] = useState<Map<string, string>>(new Map());
+  const [descMap, setDescMap] = useState<Map<string, string>>(new Map());
+
+  const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
   const [cuisineFilter, setCuisineFilter] = useState<string>("all");
   const [maxTime, setMaxTime] = useState<number | null>(null);
   const [chefFilter, setChefFilter] = useState<string>("");
@@ -64,6 +66,31 @@ const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
     fetchRecipes();
   }, []);
 
+  // On-the-fly translation for list view
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (lang !== "sv" || recipes.length === 0) {
+        setTitleMap(new Map());
+        setDescMap(new Map());
+        return;
+      }
+      const uniqueTitles = Array.from(new Set(recipes.map((r) => r.title).filter(Boolean)));
+      const uniqueDescs = Array.from(new Set(recipes.map((r) => r.description || "").filter((d) => d)));
+      const [tTitles, tDescs] = await Promise.all([
+        translateTexts(uniqueTitles, "sv", { mode: "recipe", hint: "title" }),
+        translateTexts(uniqueDescs, "sv", { mode: "recipe", hint: "description" }),
+      ]);
+      if (!mounted) return;
+      const tMap = new Map<string, string>();
+      uniqueTitles.forEach((t, i) => tMap.set(t, tTitles[i] || t));
+      setTitleMap(tMap);
+      const dMap = new Map<string, string>();
+      uniqueDescs.forEach((d, i) => dMap.set(d, tDescs[i] || d));
+      setDescMap(dMap);
+    })();
+    return () => { mounted = false; };
+  }, [lang, recipes]);
   const fetchRecipes = async () => {
     try {
       const { data, error } = await supabase
@@ -179,15 +206,15 @@ const filteredRecipes = recipes.filter((recipe) => {
         {/* Header Section */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">My Recipe Library</h1>
+            <h1 className="text-3xl font-bold text-foreground">{lang === 'sv' ? 'Mitt receptbibliotek' : 'My Recipe Library'}</h1>
             <p className="text-muted-foreground mt-2">
-              {recipes.length} recipe{recipes.length !== 1 ? 's' : ''} saved
+              {recipes.length} {lang === 'sv' ? 'recept' : 'recipe'}{recipes.length !== 1 ? (lang === 'sv' ? 'er' : 's') : ''} {lang === 'sv' ? 'sparade' : 'saved'}
             </p>
           </div>
           <AddRecipeDialog>
             <Button className="bg-emerald-600 hover:bg-emerald-700">
               <Plus className="w-4 h-4 mr-2" />
-              Add Recipe
+              {lang === 'sv' ? 'Lägg till recept' : 'Add Recipe'}
             </Button>
           </AddRecipeDialog>
         </div>
@@ -197,7 +224,7 @@ const filteredRecipes = recipes.filter((recipe) => {
   <div className="relative">
     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
     <Input
-      placeholder="Search recipes by title, description, or cuisine..."
+      placeholder={lang === 'sv' ? 'Sök recept efter titel, beskrivning eller kök...' : 'Search recipes by title, description, or cuisine...'}
       value={searchTerm}
       onChange={(e) => setSearchTerm(e.target.value)}
       className="pl-10"
@@ -398,10 +425,10 @@ const filteredRecipes = recipes.filter((recipe) => {
   <Trash2 className="w-4 h-4" />
 </Button>
 <CardHeader className="pr-12">
-                  <CardTitle className="line-clamp-2">{recipe.title}</CardTitle>
+                  <CardTitle className="line-clamp-2">{lang === 'sv' ? (titleMap.get(recipe.title) || recipe.title) : recipe.title}</CardTitle>
                   {recipe.description && (
                     <CardDescription className="line-clamp-2">
-                      {recipe.description}
+                      {lang === 'sv' ? (descMap.get(recipe.description) || recipe.description) : recipe.description}
                     </CardDescription>
                   )}
                 </CardHeader>

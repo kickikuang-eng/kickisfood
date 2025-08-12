@@ -1,4 +1,4 @@
-import { Citrus, BookOpen, User, LogOut, ShoppingCart } from "lucide-react";
+import { Citrus, BookOpen, User, LogOut, ShoppingCart, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -8,10 +8,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useLanguage } from "@/contexts/LanguageProvider";
 
 export const Header = () => {
   const location = useLocation();
   const { user, signOut } = useAuth();
+  const { lang, setLang } = useLanguage();
 
   return (
     <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
@@ -29,7 +31,22 @@ export const Header = () => {
           </Link>
 
           {/* Navigation */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
+            {/* Language */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center gap-2">
+                  <Globe className="w-4 h-4" />
+                  <span className="hidden sm:inline">{lang === 'sv' ? 'Svenska' : 'English'}</span>
+                  <span className="sm:hidden uppercase">{lang}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setLang('en')}>English</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setLang('sv')}>Svenska</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             {user ? (
               <>
                 <Link to="/library">
