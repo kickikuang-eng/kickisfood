@@ -346,11 +346,16 @@ serve(async (req) => {
       }
     }
 
-    // For Instagram, skip Firecrawl entirely to avoid 403 blocks
-    // For TikTok, try Firecrawl but with fallback
+    // Attempt scraping
     if (platform === "instagram") {
-      // Instagram handled above with oEmbed
-      console.log("Skipping Firecrawl for Instagram to avoid 403 blocks");
+      try {
+        console.log("Attempting Instagram scraping with Firecrawl...");
+        scraped = await scrapeWithFirecrawl(videoUrl);
+        ogImage = parseOgImageFromHtml(scraped.html);
+        console.log("Instagram scraping successful");
+      } catch (e) {
+        console.warn("Instagram scraping failed (may be 403). Will fallback to oEmbed/placeholder if available:", e);
+      }
     } else if (platform === "tiktok") {
       try {
         console.log("Attempting TikTok scraping with Firecrawl...");
@@ -380,52 +385,95 @@ serve(async (req) => {
       }
     }
 
-    // Branch: Instagram -> create non-AI placeholder to avoid random recipes
+    // Analysis & insert
     if (platform === "instagram") {
-      if (!igOembed) {
-        // No reliable metadata; stop here with a clear error
-        return new Response(
-          JSON.stringify({ success: false, error: "Instagram parsing failed. Please ensure the post is public or try again later." } satisfies ExtractResponse),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+      if (scraped?.markdown || scraped?.html) {
+        // We have real content -> use AI extraction
+        const prompt = buildPrompt(videoUrl, platform, scraped.markdown, scraped.html);
+        const raw = await analyzeWithGemini(prompt);
+        const authorFromUrl = (igOembed?.author_name as string | undefined) || extractAuthorFromUrl(videoUrl);
+        const normalized = normalizeRecipe(raw, ogImage, authorFromUrl);
 
-      const caption: string = igOembed?.title || "";
-      const authorName: string | null = igOembed?.author_name || extractAuthorFromUrl(videoUrl) || null;
+        const insertPayload = {
+          user_id: userId,
+          title: normalized.title,
+          description: normalized.description,
+          ingredients: normalized.ingredients,
+          instructions: normalized.instructions,
+          prep_time: normalized.prep_time,
+          cook_time: normalized.cook_time,
+          servings: normalized.servings,
+          image_url: normalized.image_url,
+          source_url: videoUrl,
+          cuisine: normalized.cuisine,
+          difficulty: normalized.difficulty,
+          chef: normalized.chef,
+        };
 
-      const insertPayload = {
-        user_id: userId,
-        title: "Recipe from Instagram Video - Manual Review Needed",
-        description: caption || null,
-        ingredients: [] as string[],
-        instructions: [] as string[],
-        prep_time: null as number | null,
-        cook_time: null as number | null,
-        servings: null as number | null,
-        image_url: ogImage || null,
-        source_url: videoUrl,
-        cuisine: null as string | null,
-        difficulty: null as string | null,
-        chef: authorName,
-      };
+        const { data: inserted, error: insertError } = await supabase
+          .from("recipes")
+          .insert(insertPayload)
+          .select()
+          .single();
 
-      const { data: inserted, error: insertError } = await supabase
-        .from("recipes")
-        .insert(insertPayload)
-        .select()
-        .single();
+        if (insertError) {
+          console.error("Insert error", insertError);
+          return new Response(JSON.stringify({ success: false, error: insertError.message } satisfies ExtractResponse), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
 
-      if (insertError) {
-        console.error("Insert error", insertError);
-        return new Response(JSON.stringify({ success: false, error: insertError.message } satisfies ExtractResponse), {
-          status: 500,
+        return new Response(JSON.stringify({ success: true, recipe: inserted } satisfies ExtractResponse), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      return new Response(JSON.stringify({ success: true, recipe: inserted } satisfies ExtractResponse), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      // No scraped content -> if we have basic oEmbed, create a clear placeholder entry
+      if (igOembed) {
+        const caption: string = igOembed?.title || "";
+        const authorName: string | null = igOembed?.author_name || extractAuthorFromUrl(videoUrl) || null;
+
+        const insertPayload = {
+          user_id: userId,
+          title: "Recipe from Instagram Video - Manual Review Needed",
+          description: caption || null,
+          ingredients: [] as string[],
+          instructions: [] as string[],
+          prep_time: null as number | null,
+          cook_time: null as number | null,
+          servings: null as number | null,
+          image_url: ogImage || null,
+          source_url: videoUrl,
+          cuisine: null as string | null,
+          difficulty: null as string | null,
+          chef: authorName,
+        };
+
+        const { data: inserted, error: insertError } = await supabase
+          .from("recipes")
+          .insert(insertPayload)
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error("Insert error", insertError);
+          return new Response(JSON.stringify({ success: false, error: insertError.message } satisfies ExtractResponse), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({ success: true, recipe: inserted } satisfies ExtractResponse), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Nothing worked
+      return new Response(
+        JSON.stringify({ success: false, error: "Instagram parsing failed. Please ensure the post is public or try again later." } satisfies ExtractResponse),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Non-Instagram: use AI extraction
