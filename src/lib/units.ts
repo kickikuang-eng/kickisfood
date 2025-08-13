@@ -120,16 +120,22 @@ export function convertIngredientUnitsToSwedish(line: string): string {
         let display = `${formatNumber(newQty)} ${unit}`;
         // Prefer ml→dl or l with nicer thresholds
         if (unit === "msk" || unit === "tsk") {
-          display = `${formatNumber(newQty)} ${unit}`; // here qty is ml but unit label is msk/tsk; that’s okay for display
+          display = `${formatNumber(newQty)} ${unit}`; // qty is ml but label is msk/tsk; acceptable for display
         }
         if (unit === "ml") {
           // 100 ml = 1 dl; show dl when >= 100 ml
           if (newQty >= 100) {
             const dl = newQty / 100;
-            display = `${formatNumber(dl)} dl`;
+            const rounded = Math.round(dl * 2) / 2; // round to nearest 0.5 dl
+            display = `${formatNumber(rounded)} dl`;
           } else {
             display = `${formatNumber(newQty)} ml`;
           }
+        }
+        // Ensure dl values are rounded nicely to 0.5 steps (e.g., 2.37 dl -> 2.5 dl)
+        if (unit === "dl") {
+          const rounded = Math.round(newQty * 2) / 2;
+          display = `${formatNumber(rounded)} dl`;
         }
         if (unit === "g") {
           if (newQty >= 1000) {
