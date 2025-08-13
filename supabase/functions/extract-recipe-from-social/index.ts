@@ -282,14 +282,14 @@ serve(async (req) => {
 
     if (platform === "instagram") {
       try {
-        const appId = Deno.env.get("FACEBOOK_APP_ID");
-        const appSecret = Deno.env.get("FACEBOOK_APP_SECRET");
+        const appId = Deno.env.get("FB_APP_ID");
+        const clientToken = Deno.env.get("FB_CLIENT_TOKEN");
         
-        if (appId && appSecret) {
+        if (appId && clientToken) {
           console.log("Attempting Instagram oEmbed with Facebook App credentials...");
           
-          // Use app access token format: {app-id}|{app-secret}
-          const accessToken = `${appId}|${appSecret}`;
+          // Use app access token format: {app-id}|{client-token}
+          const accessToken = `${appId}|${clientToken}`;
           const oembedUrl = `https://graph.facebook.com/v19.0/instagram_oembed?url=${encodeURIComponent(videoUrl)}&access_token=${accessToken}&omitscript=true`;
           
           console.log("Instagram oEmbed URL:", oembedUrl);
@@ -339,7 +339,7 @@ serve(async (req) => {
             }
           }
         } else {
-          console.warn("FACEBOOK_APP_ID and FACEBOOK_APP_SECRET not set; skipping Instagram oEmbed.");
+          console.warn("FB_APP_ID and FB_CLIENT_TOKEN not set; skipping Instagram oEmbed.");
         }
       } catch (e) {
         console.warn("Instagram oEmbed fetch error:", e);
@@ -380,12 +380,60 @@ serve(async (req) => {
       }
     }
 
-    // Analyze
+    // Branch: Instagram -> create non-AI placeholder to avoid random recipes
+    if (platform === "instagram") {
+      if (!igOembed) {
+        // No reliable metadata; stop here with a clear error
+        return new Response(
+          JSON.stringify({ success: false, error: "Instagram parsing failed. Please ensure the post is public or try again later." } satisfies ExtractResponse),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const caption: string = igOembed?.title || "";
+      const authorName: string | null = igOembed?.author_name || extractAuthorFromUrl(videoUrl) || null;
+
+      const insertPayload = {
+        user_id: userId,
+        title: "Recipe from Instagram Video - Manual Review Needed",
+        description: caption || null,
+        ingredients: [] as string[],
+        instructions: [] as string[],
+        prep_time: null as number | null,
+        cook_time: null as number | null,
+        servings: null as number | null,
+        image_url: ogImage || null,
+        source_url: videoUrl,
+        cuisine: null as string | null,
+        difficulty: null as string | null,
+        chef: authorName,
+      };
+
+      const { data: inserted, error: insertError } = await supabase
+        .from("recipes")
+        .insert(insertPayload)
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error("Insert error", insertError);
+        return new Response(JSON.stringify({ success: false, error: insertError.message } satisfies ExtractResponse), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ success: true, recipe: inserted } satisfies ExtractResponse), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Non-Instagram: use AI extraction
     let prompt: string;
     if (igOembed) {
       const caption = igOembed?.title || "";
       const authorName = igOembed?.author_name || extractAuthorFromUrl(videoUrl) || "";
-      const md = `Instagram oEmbed\nCaption: ${caption}\nAuthor: ${authorName}\nThumbnail: ${ogImage || ""}`;
+      const md = `Social oEmbed\nCaption: ${caption}\nAuthor: ${authorName}\nThumbnail: ${ogImage || ""}`;
       prompt = buildPrompt(videoUrl, platform, md, undefined);
     } else {
       prompt = buildPrompt(videoUrl, platform, scraped?.markdown, scraped?.html);
@@ -393,22 +441,22 @@ serve(async (req) => {
     const raw = await analyzeWithGemini(prompt);
     const authorFromUrl = (igOembed?.author_name as string | undefined) || extractAuthorFromUrl(videoUrl);
     const normalized = normalizeRecipe(raw, ogImage, authorFromUrl);
-    // Insert
-const insertPayload = {
-  user_id: userId,
-  title: normalized.title,
-  description: normalized.description,
-  ingredients: normalized.ingredients,
-  instructions: normalized.instructions,
-  prep_time: normalized.prep_time,
-  cook_time: normalized.cook_time,
-  servings: normalized.servings,
-  image_url: normalized.image_url,
-  source_url: videoUrl,
-  cuisine: normalized.cuisine,
-  difficulty: normalized.difficulty,
-  chef: normalized.chef,
-};
+
+    const insertPayload = {
+      user_id: userId,
+      title: normalized.title,
+      description: normalized.description,
+      ingredients: normalized.ingredients,
+      instructions: normalized.instructions,
+      prep_time: normalized.prep_time,
+      cook_time: normalized.cook_time,
+      servings: normalized.servings,
+      image_url: normalized.image_url,
+      source_url: videoUrl,
+      cuisine: normalized.cuisine,
+      difficulty: normalized.difficulty,
+      chef: normalized.chef,
+    };
 
     const { data: inserted, error: insertError } = await supabase
       .from("recipes")
