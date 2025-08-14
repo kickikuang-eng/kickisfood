@@ -108,43 +108,90 @@ function extractAuthorFromUrl(url: string): string | null {
   }
 }
 
-async function scrapeWithFirecrawl(targetUrl: string): Promise<{ markdown?: string; html?: string; finalUrl?: string; }> {
-  const apiKey = Deno.env.get("FIRECRAWL_API_KEY");
-  if (!apiKey) throw new Error("FIRECRAWL_API_KEY is not set");
+async function scrapeWithApify(instagramUrl: string): Promise<{ caption?: string; author?: string; thumbnailUrl?: string; }> {
+  const apiToken = Deno.env.get("APIFY_API_TOKEN");
+  if (!apiToken) throw new Error("APIFY_API_TOKEN is not set");
 
-  // Prefer single-page scrape
-  const scrapeEndpoint = "https://api.firecrawl.dev/v1/scrape";
-  const headers = {
-    "Authorization": `Bearer ${apiKey}`,
-    "Content-Type": "application/json",
-  };
-
-  const body = JSON.stringify({ url: targetUrl, formats: ["markdown", "html"] });
-  let res = await fetch(scrapeEndpoint, { method: "POST", headers, body });
-
-  if (!res.ok) {
-    // Fallback to crawl with limit 1
-    const crawlEndpoint = "https://api.firecrawl.dev/v1/crawl";
-    res = await fetch(crawlEndpoint, {
+  try {
+    console.log("Starting Apify Instagram scraping for:", instagramUrl);
+    
+    // Start the actor run
+    const actorRunResponse = await fetch("https://api.apify.com/v2/acts/presetshubham~instagram-reel-downloader/runs", {
       method: "POST",
-      headers,
-      body: JSON.stringify({ url: targetUrl, limit: 1, scrapeOptions: { formats: ["markdown", "html"] } }),
+      headers: {
+        "Authorization": `Bearer ${apiToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        reelLinks: [instagramUrl],
+        proxy: "none"
+      }),
     });
-  }
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Firecrawl error: ${res.status} ${text}`);
-  }
+    if (!actorRunResponse.ok) {
+      const errorText = await actorRunResponse.text();
+      throw new Error(`Apify actor start failed: ${actorRunResponse.status} ${errorText}`);
+    }
 
-  const data = await res.json();
-  // Normalize potential shapes
-  // Possible shapes: { success, data: { markdown, html, ... } } OR { success, data: [{ markdown, html }]} OR direct fields
-  const first = data?.data?.markdown || data?.markdown ? data.data || data : (Array.isArray(data?.data) ? data.data[0] : null);
-  const markdown = first?.markdown || data?.markdown || null;
-  const html = first?.html || data?.html || null;
-  const finalUrl = first?.metadata?.url || data?.metadata?.url || targetUrl;
-  return { markdown: markdown || undefined, html: html || undefined, finalUrl };
+    const runData = await actorRunResponse.json();
+    const runId = runData.data.id;
+    console.log("Apify run started with ID:", runId);
+
+    // Wait for the run to complete (with timeout)
+    let attempts = 0;
+    const maxAttempts = 30; // 30 seconds timeout
+    
+    while (attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+      
+      const statusResponse = await fetch(`https://api.apify.com/v2/actor-runs/${runId}`, {
+        headers: { "Authorization": `Bearer ${apiToken}` }
+      });
+      
+      if (!statusResponse.ok) {
+        throw new Error(`Failed to check run status: ${statusResponse.status}`);
+      }
+      
+      const statusData = await statusResponse.json();
+      const status = statusData.data.status;
+      
+      console.log(`Apify run status (attempt ${attempts + 1}):`, status);
+      
+      if (status === "SUCCEEDED") {
+        // Get the results
+        const resultsResponse = await fetch(`https://api.apify.com/v2/datasets/${statusData.data.defaultDatasetId}/items`, {
+          headers: { "Authorization": `Bearer ${apiToken}` }
+        });
+        
+        if (!resultsResponse.ok) {
+          throw new Error(`Failed to get results: ${resultsResponse.status}`);
+        }
+        
+        const results = await resultsResponse.json();
+        console.log("Apify results:", results);
+        
+        if (results && results.length > 0) {
+          const result = results[0];
+          return {
+            caption: result.caption || result.description || null,
+            author: result.owner || result.username || null,
+            thumbnailUrl: result.thumbnail || result.cover || null
+          };
+        }
+        
+        return {};
+      } else if (status === "FAILED") {
+        throw new Error("Apify run failed");
+      }
+      
+      attempts++;
+    }
+    
+    throw new Error("Apify run timeout");
+  } catch (error) {
+    console.error("Apify scraping error:", error);
+    throw error;
+  }
 }
 
 function buildPrompt(sourceUrl: string, platform: string, scrapedMarkdown?: string, scrapedHtml?: string) {
@@ -275,264 +322,123 @@ serve(async (req) => {
       global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
     });
 
-    // Scrape or fallback (Instagram oEmbed)
-    let scraped: { markdown?: string; html?: string; finalUrl?: string } | null = null;
-    let ogImage: string | null = null;
-    let igOembed: any | null = null;
+    // Instagram scraping with Apify
+    let apifyData: { caption?: string; author?: string; thumbnailUrl?: string; } | null = null;
 
     if (platform === "instagram") {
       try {
-        const appId = Deno.env.get("FB_APP_ID");
-        const clientToken = Deno.env.get("FB_CLIENT_TOKEN");
-        
-        if (appId && clientToken) {
-          console.log("Attempting Instagram oEmbed with Facebook App credentials...");
-          
-          // Use app access token format: {app-id}|{client-token}
-          const accessToken = `${appId}|${clientToken}`;
-          const oembedUrl = `https://graph.facebook.com/v19.0/instagram_oembed?url=${encodeURIComponent(videoUrl)}&access_token=${accessToken}&omitscript=true`;
-          
-          console.log("Instagram oEmbed URL:", oembedUrl);
-          
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 15000); // Increased timeout
-          
-          const oRes = await fetch(oembedUrl, {
-            signal: controller.signal,
-            headers: {
-              "Accept": "application/json",
-              "User-Agent": "Mozilla/5.0 (compatible; LovableBot/1.0; +https://lovable.dev)"
-            }
-          });
-          
-          clearTimeout(timer);
-          
-          if (oRes.ok) {
-            igOembed = await oRes.json();
-            console.log("Instagram oEmbed response:", igOembed);
-            ogImage = igOembed?.thumbnail_url || null;
-            
-            if (ogImage) {
-              console.log("Found Instagram thumbnail:", ogImage);
-            }
-          } else {
-            const txt = await oRes.text();
-            console.warn("Instagram oEmbed request failed", oRes.status, txt);
-            
-            // Try alternative approach for public Instagram posts
-            if (oRes.status === 400 || oRes.status === 403) {
-              console.log("Trying alternative Instagram scraping approach...");
-              try {
-                // Try to get basic info from the URL structure
-                const urlInfo = extractInstagramInfo(videoUrl);
-                if (urlInfo) {
-                  igOembed = {
-                    title: `Instagram Recipe from ${urlInfo.username || 'unknown user'}`,
-                    author_name: urlInfo.username || 'Instagram User',
-                    thumbnail_url: null
-                  };
-                  console.log("Created fallback Instagram info:", igOembed);
-                }
-              } catch (fallbackError) {
-                console.warn("Instagram fallback also failed:", fallbackError);
-              }
-            }
-          }
-        } else {
-          console.warn("FB_APP_ID and FB_CLIENT_TOKEN not set; skipping Instagram oEmbed.");
-        }
+        console.log("Attempting Instagram scraping with Apify...");
+        apifyData = await scrapeWithApify(videoUrl);
+        console.log("Apify scraping successful:", apifyData);
       } catch (e) {
-        console.warn("Instagram oEmbed fetch error:", e);
-      }
-    }
-
-    // Attempt scraping
-    if (platform === "instagram") {
-      try {
-        console.log("Attempting Instagram scraping with Firecrawl...");
-        scraped = await scrapeWithFirecrawl(videoUrl);
-        ogImage = parseOgImageFromHtml(scraped.html);
-        console.log("Instagram scraping successful, got markdown:", !!scraped.markdown, "html:", !!scraped.html);
-      } catch (e) {
-        console.warn("Instagram scraping failed. Error details:", e);
-        // Always create fallback info for Instagram when scraping fails
+        console.warn("Apify Instagram scraping failed. Error details:", e);
+        // Create fallback info for Instagram when scraping fails
         const urlInfo = extractInstagramInfo(videoUrl);
-        if (urlInfo && !igOembed) {
-          igOembed = {
-            title: `Instagram Recipe from ${urlInfo.username || 'Instagram User'}`,
-            author_name: urlInfo.username || 'Instagram User',
-            thumbnail_url: null
-          };
-          console.log("Created fallback Instagram info from URL structure:", igOembed);
-        }
-      }
-    } else if (platform === "tiktok") {
-      try {
-        console.log("Attempting TikTok scraping with Firecrawl...");
-        scraped = await scrapeWithFirecrawl(videoUrl);
-        ogImage = parseOgImageFromHtml(scraped.html);
-        console.log("TikTok scraping successful");
-      } catch (e) {
-        console.warn("TikTok scraping failed, using fallback approach:", e);
-        // Create fallback TikTok info
-        const urlInfo = extractTikTokInfo(videoUrl);
         if (urlInfo) {
-          igOembed = {
-            title: `TikTok Recipe from ${urlInfo.username || 'unknown user'}`,
-            author_name: urlInfo.username || 'TikTok User',
-            thumbnail_url: null
+          apifyData = {
+            caption: `Instagram Recipe from ${urlInfo.username || 'Instagram User'}`,
+            author: urlInfo.username || 'Instagram User',
+            thumbnailUrl: null
           };
-          console.log("Created fallback TikTok info:", igOembed);
+          console.log("Created fallback Instagram info from URL structure:", apifyData);
         }
       }
     } else {
-      try {
-        scraped = await scrapeWithFirecrawl(videoUrl);
-        ogImage = parseOgImageFromHtml(scraped.html);
-      } catch (e) {
-        // Non-Instagram/TikTok URLs should surface scrape errors
-        throw e;
+      // For non-Instagram platforms, we'll handle them separately or throw error
+      if (platform === "tiktok" || platform === "youtube") {
+        throw new Error(`${platform} is not supported yet. Please use Instagram reels.`);
+      } else {
+        throw new Error("Unsupported platform. Please use Instagram reels.");
       }
     }
 
-    // Analysis & insert
-    if (platform === "instagram") {
-      if (scraped?.markdown || scraped?.html) {
-        // We have real content -> use AI extraction
-        const prompt = buildPrompt(videoUrl, platform, scraped.markdown, scraped.html);
-        const raw = await analyzeWithGemini(prompt);
-        const authorFromUrl = (igOembed?.author_name as string | undefined) || extractAuthorFromUrl(videoUrl);
-        const normalized = normalizeRecipe(raw, ogImage, authorFromUrl);
+    // Analysis & insert for Instagram only
+    if (platform === "instagram" && apifyData) {
+      // Build content for AI analysis
+      const content = `Instagram Caption: ${apifyData.caption || ""}
+Author: ${apifyData.author || ""}`;
+      
+      const prompt = buildPrompt(videoUrl, platform, content, undefined);
+      const raw = await analyzeWithGemini(prompt);
+      const normalized = normalizeRecipe(raw, apifyData.thumbnailUrl, apifyData.author);
 
-        const insertPayload = {
-          user_id: userId,
-          title: normalized.title,
-          description: normalized.description,
-          ingredients: normalized.ingredients,
-          instructions: normalized.instructions,
-          prep_time: normalized.prep_time,
-          cook_time: normalized.cook_time,
-          servings: normalized.servings,
-          image_url: normalized.image_url,
-          source_url: videoUrl,
-          cuisine: normalized.cuisine,
-          difficulty: normalized.difficulty,
-          chef: normalized.chef,
-        };
+      const insertPayload = {
+        user_id: userId,
+        title: normalized.title,
+        description: normalized.description,
+        ingredients: normalized.ingredients,
+        instructions: normalized.instructions,
+        prep_time: normalized.prep_time,
+        cook_time: normalized.cook_time,
+        servings: normalized.servings,
+        image_url: normalized.image_url,
+        source_url: videoUrl,
+        cuisine: normalized.cuisine,
+        difficulty: normalized.difficulty,
+        chef: normalized.chef,
+      };
 
-        const { data: inserted, error: insertError } = await supabase
-          .from("recipes")
-          .insert(insertPayload)
-          .select()
-          .single();
+      const { data: inserted, error: insertError } = await supabase
+        .from("recipes")
+        .insert(insertPayload)
+        .select()
+        .single();
 
-        if (insertError) {
-          console.error("Insert error", insertError);
-          return new Response(JSON.stringify({ success: false, error: insertError.message } satisfies ExtractResponse), {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-
-        return new Response(JSON.stringify({ success: true, recipe: inserted } satisfies ExtractResponse), {
+      if (insertError) {
+        console.error("Insert error", insertError);
+        return new Response(JSON.stringify({ success: false, error: insertError.message } satisfies ExtractResponse), {
+          status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // No scraped content -> if we have basic oEmbed, create a clear placeholder entry
-      if (igOembed) {
-        const caption: string = igOembed?.title || "";
-        const authorName: string | null = igOembed?.author_name || extractAuthorFromUrl(videoUrl) || null;
-
-        const insertPayload = {
-          user_id: userId,
-          title: "Recipe from Instagram Video - Manual Review Needed",
-          description: caption || null,
-          ingredients: [] as string[],
-          instructions: [] as string[],
-          prep_time: null as number | null,
-          cook_time: null as number | null,
-          servings: null as number | null,
-          image_url: ogImage || null,
-          source_url: videoUrl,
-          cuisine: null as string | null,
-          difficulty: null as string | null,
-          chef: authorName,
-        };
-
-        const { data: inserted, error: insertError } = await supabase
-          .from("recipes")
-          .insert(insertPayload)
-          .select()
-          .single();
-
-        if (insertError) {
-          console.error("Insert error", insertError);
-          return new Response(JSON.stringify({ success: false, error: insertError.message } satisfies ExtractResponse), {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-
-        return new Response(JSON.stringify({ success: true, recipe: inserted } satisfies ExtractResponse), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      // Nothing worked
-      return new Response(
-        JSON.stringify({ success: false, error: "Instagram parsing failed. Please ensure the post is public or try again later." } satisfies ExtractResponse),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Non-Instagram: use AI extraction
-    let prompt: string;
-    if (igOembed) {
-      const caption = igOembed?.title || "";
-      const authorName = igOembed?.author_name || extractAuthorFromUrl(videoUrl) || "";
-      const md = `Social oEmbed\nCaption: ${caption}\nAuthor: ${authorName}\nThumbnail: ${ogImage || ""}`;
-      prompt = buildPrompt(videoUrl, platform, md, undefined);
-    } else {
-      prompt = buildPrompt(videoUrl, platform, scraped?.markdown, scraped?.html);
-    }
-    const raw = await analyzeWithGemini(prompt);
-    const authorFromUrl = (igOembed?.author_name as string | undefined) || extractAuthorFromUrl(videoUrl);
-    const normalized = normalizeRecipe(raw, ogImage, authorFromUrl);
-
-    const insertPayload = {
-      user_id: userId,
-      title: normalized.title,
-      description: normalized.description,
-      ingredients: normalized.ingredients,
-      instructions: normalized.instructions,
-      prep_time: normalized.prep_time,
-      cook_time: normalized.cook_time,
-      servings: normalized.servings,
-      image_url: normalized.image_url,
-      source_url: videoUrl,
-      cuisine: normalized.cuisine,
-      difficulty: normalized.difficulty,
-      chef: normalized.chef,
-    };
-
-    const { data: inserted, error: insertError } = await supabase
-      .from("recipes")
-      .insert(insertPayload)
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error("Insert error", insertError);
-      return new Response(JSON.stringify({ success: false, error: insertError.message } satisfies ExtractResponse), {
-        status: 500,
+      return new Response(JSON.stringify({ success: true, recipe: inserted } satisfies ExtractResponse), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(JSON.stringify({ success: true, recipe: inserted } satisfies ExtractResponse), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    // If we have fallback data but no proper scraping
+    if (platform === "instagram" && apifyData && apifyData.caption && apifyData.caption.includes("Manual Review Needed")) {
+      const insertPayload = {
+        user_id: userId,
+        title: "Recipe from Instagram Video - Manual Review Needed",
+        description: apifyData.caption || null,
+        ingredients: [] as string[],
+        instructions: [] as string[],
+        prep_time: null as number | null,
+        cook_time: null as number | null,
+        servings: null as number | null,
+        image_url: apifyData.thumbnailUrl || null,
+        source_url: videoUrl,
+        cuisine: null as string | null,
+        difficulty: null as string | null,
+        chef: apifyData.author,
+      };
+
+      const { data: inserted, error: insertError } = await supabase
+        .from("recipes")
+        .insert(insertPayload)
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error("Insert error", insertError);
+        return new Response(JSON.stringify({ success: false, error: insertError.message } satisfies ExtractResponse), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ success: true, recipe: inserted } satisfies ExtractResponse), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Nothing worked
+    return new Response(
+      JSON.stringify({ success: false, error: "Instagram parsing failed. Please ensure the post is public or try again later." } satisfies ExtractResponse),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   } catch (err: any) {
     console.error("extract-recipe-from-social error", err);
     return new Response(JSON.stringify({ success: false, error: err?.message || "Unexpected error" } satisfies ExtractResponse), {
