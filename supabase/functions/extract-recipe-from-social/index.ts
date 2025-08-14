@@ -352,9 +352,19 @@ serve(async (req) => {
         console.log("Attempting Instagram scraping with Firecrawl...");
         scraped = await scrapeWithFirecrawl(videoUrl);
         ogImage = parseOgImageFromHtml(scraped.html);
-        console.log("Instagram scraping successful");
+        console.log("Instagram scraping successful, got markdown:", !!scraped.markdown, "html:", !!scraped.html);
       } catch (e) {
-        console.warn("Instagram scraping failed (may be 403). Will fallback to oEmbed/placeholder if available:", e);
+        console.warn("Instagram scraping failed. Error details:", e);
+        // Always create fallback info for Instagram when scraping fails
+        const urlInfo = extractInstagramInfo(videoUrl);
+        if (urlInfo && !igOembed) {
+          igOembed = {
+            title: `Instagram Recipe from ${urlInfo.username || 'Instagram User'}`,
+            author_name: urlInfo.username || 'Instagram User',
+            thumbnail_url: null
+          };
+          console.log("Created fallback Instagram info from URL structure:", igOembed);
+        }
       }
     } else if (platform === "tiktok") {
       try {
