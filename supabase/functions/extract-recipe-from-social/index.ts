@@ -201,6 +201,22 @@ async function scrapeWithApify(url: string, platform: 'instagram' | 'tiktok'): P
               author: result.authorMeta?.name || result.author?.uniqueId || result.username || null,
               thumbnailUrl: result.covers?.[0] || result.thumbnail || result.cover || null
             };
+          }
+        }
+        
+        return {};
+      } else if (status === "FAILED") {
+        throw new Error("Apify run failed");
+      }
+      
+      attempts++;
+    }
+    
+    throw new Error("Apify run timeout");
+  } catch (error) {
+    console.error("Apify scraping error:", error);
+    throw error;
+  }
 }
 
 async function downloadImageToStorage(supabase: any, imageUrl: string, recipeId: string): Promise<string | null> {
@@ -247,21 +263,6 @@ async function downloadImageToStorage(supabase: any, imageUrl: string, recipeId:
   } catch (error) {
     console.error("Error downloading/uploading image:", error);
     return null;
-  }
-        }
-        
-        return {};
-      } else if (status === "FAILED") {
-        throw new Error("Apify run failed");
-      }
-      
-      attempts++;
-    }
-    
-    throw new Error("Apify run timeout");
-  } catch (error) {
-    console.error("Apify scraping error:", error);
-    throw error;
   }
 }
 
