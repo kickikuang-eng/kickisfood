@@ -10,7 +10,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { Plus, Link, Loader2, FileText, Video, ArrowLeft } from "lucide-react";
 
 interface AddRecipeDialogProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  defaultMode?: AddMode;
 }
 
 type AddMode = 'select' | 'manual' | 'social';
@@ -28,13 +31,17 @@ interface ManualRecipeForm {
   chef: string;
 }
 
-export const AddRecipeDialog = ({ children }: AddRecipeDialogProps) => {
-  const [mode, setMode] = useState<AddMode>('select');
+export const AddRecipeDialog = ({ children, open: externalOpen, onOpenChange: externalOnOpenChange, defaultMode = 'select' }: AddRecipeDialogProps) => {
+  const [mode, setMode] = useState<AddMode>(defaultMode);
   const [url, setUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  
+  // Use external props if provided, otherwise use internal state
+  const open = externalOpen !== undefined ? externalOpen : internalOpen;
+  const setOpen = externalOnOpenChange || setInternalOpen;
   
 const [manualForm, setManualForm] = useState<ManualRecipeForm>({
     title: '',
@@ -199,7 +206,7 @@ const { error } = await supabase
 
   const resetDialog = () => {
     setOpen(false);
-    setMode('select');
+    setMode(defaultMode);
     setUrl('');
 setManualForm({
       title: '',
@@ -217,9 +224,11 @@ setManualForm({
 
   return (
     <Dialog open={open} onOpenChange={(open) => { setOpen(open); if (!open) resetDialog(); }}>
-      <DialogTrigger asChild>
-        {children}
-      </DialogTrigger>
+      {children && (
+        <DialogTrigger asChild>
+          {children}
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         {mode === 'select' && (
           <>

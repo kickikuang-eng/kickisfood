@@ -8,13 +8,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Search, Clock, Users, ChefHat, ChevronsUpDown, Trash2 } from "lucide-react";
+import { Plus, Search, Clock, Users, ChefHat, ChevronsUpDown, Trash2, ChevronDown } from "lucide-react";
 import { AddRecipeDialog } from "@/components/AddRecipeDialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useLanguage } from "../contexts/LanguageProvider";
 import { translateTexts } from "@/lib/translate";
 interface Recipe {
@@ -38,6 +39,7 @@ const RecipeLibrary = () => {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [addRecipeDialogOpen, setAddRecipeDialogOpen] = useState(false);
   const { toast } = useToast();
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -213,12 +215,25 @@ const filteredRecipes = recipes.filter((recipe) => {
               {recipes.length} {lang === 'sv' ? 'recept' : 'recipe'}{recipes.length !== 1 ? (lang === 'sv' ? 'er' : 's') : ''} {lang === 'sv' ? 'sparade' : 'saved'}
             </p>
           </div>
-          <AddRecipeDialog>
-            <Button className="bg-emerald-600 hover:bg-emerald-700">
-              <Plus className="w-4 h-4 mr-2" />
-              {lang === 'sv' ? 'Lägg till recept' : 'Add Recipe'}
-            </Button>
-          </AddRecipeDialog>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button className="bg-emerald-600 hover:bg-emerald-700">
+                <Plus className="w-4 h-4 mr-2" />
+                {lang === 'sv' ? 'Lägg till recept' : 'Add Recipe'}
+                <ChevronDown className="w-4 h-4 ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => navigate('/analyze')}>
+                {lang === 'sv' ? 'Från sociala medier' : 'Add from Social Media'}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setAddRecipeDialogOpen(true)}>
+                {lang === 'sv' ? 'Lägg till manuellt' : 'Add Manually'}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          
+          <AddRecipeDialog open={addRecipeDialogOpen} onOpenChange={setAddRecipeDialogOpen} defaultMode="manual" />
         </div>
 
 {/* Search + Filters */}
@@ -388,12 +403,23 @@ const filteredRecipes = recipes.filter((recipe) => {
             <p className="text-muted-foreground mb-6">
               Start building your recipe collection by adding your first recipe
             </p>
-            <AddRecipeDialog>
-              <Button className="bg-emerald-600 hover:bg-emerald-700">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Your First Recipe
-              </Button>
-            </AddRecipeDialog>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button className="bg-emerald-600 hover:bg-emerald-700">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Your First Recipe
+                  <ChevronDown className="w-4 h-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => navigate('/analyze')}>
+                  Add from Social Media
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setAddRecipeDialogOpen(true)}>
+                  Add Manually
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )}
 
