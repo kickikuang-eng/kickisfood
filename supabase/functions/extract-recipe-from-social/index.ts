@@ -201,7 +201,53 @@ async function scrapeWithApify(url: string, platform: 'instagram' | 'tiktok'): P
               author: result.authorMeta?.name || result.author?.uniqueId || result.username || null,
               thumbnailUrl: result.covers?.[0] || result.thumbnail || result.cover || null
             };
-          }
+}
+
+async function downloadImageToStorage(supabase: any, imageUrl: string, recipeId: string): Promise<string | null> {
+  if (!imageUrl) return null;
+  
+  try {
+    console.log("Downloading image from:", imageUrl);
+    
+    // Download the image
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      console.warn("Failed to download image:", imageResponse.status);
+      return null;
+    }
+    
+    const imageBlob = await imageResponse.blob();
+    const imageBuffer = await imageBlob.arrayBuffer();
+    
+    // Extract file extension from URL or default to jpg
+    const urlPath = new URL(imageUrl).pathname;
+    const extension = urlPath.split('.').pop()?.toLowerCase() || 'jpg';
+    const fileName = `${recipeId}.${extension}`;
+    
+    // Upload to storage
+    const { data, error } = await supabase.storage
+      .from('recipe-images')
+      .upload(fileName, imageBuffer, {
+        contentType: imageBlob.type || 'image/jpeg',
+        upsert: true
+      });
+    
+    if (error) {
+      console.error("Storage upload error:", error);
+      return null;
+    }
+    
+    // Get public URL
+    const { data: publicUrlData } = supabase.storage
+      .from('recipe-images')
+      .getPublicUrl(fileName);
+    
+    console.log("Image successfully uploaded to storage:", publicUrlData.publicUrl);
+    return publicUrlData.publicUrl;
+  } catch (error) {
+    console.error("Error downloading/uploading image:", error);
+    return null;
+  }
         }
         
         return {};
@@ -405,6 +451,16 @@ Author: ${apifyData.author || ""}`;
       const raw = await analyzeWithGemini(prompt);
       const normalized = normalizeRecipe(raw, apifyData.thumbnailUrl, apifyData.author);
 
+      // Download image to storage if available
+      let finalImageUrl = normalized.image_url;
+      if (apifyData.thumbnailUrl) {
+        const recipeId = crypto.randomUUID();
+        const storageImageUrl = await downloadImageToStorage(supabase, apifyData.thumbnailUrl, recipeId);
+        if (storageImageUrl) {
+          finalImageUrl = storageImageUrl;
+        }
+      }
+
       const insertPayload = {
         user_id: userId,
         title: normalized.title,
@@ -414,7 +470,7 @@ Author: ${apifyData.author || ""}`;
         prep_time: normalized.prep_time,
         cook_time: normalized.cook_time,
         servings: normalized.servings,
-        image_url: normalized.image_url,
+        image_url: finalImageUrl,
         source_url: videoUrl,
         cuisine: normalized.cuisine,
         difficulty: normalized.difficulty,
