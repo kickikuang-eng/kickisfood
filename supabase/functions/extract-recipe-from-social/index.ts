@@ -108,24 +108,40 @@ function extractAuthorFromUrl(url: string): string | null {
   }
 }
 
-async function scrapeWithApify(instagramUrl: string): Promise<{ caption?: string; author?: string; thumbnailUrl?: string; }> {
+async function scrapeWithApify(url: string, platform: 'instagram' | 'tiktok'): Promise<{ caption?: string; author?: string; thumbnailUrl?: string; }> {
   const apiToken = Deno.env.get("APIFY_API_TOKEN");
   if (!apiToken) throw new Error("APIFY_API_TOKEN is not set");
 
   try {
-    console.log("Starting Apify Instagram scraping for:", instagramUrl);
+    console.log(`Starting Apify ${platform} scraping for:`, url);
+    
+    let actorId: string;
+    let payload: any;
+    
+    if (platform === 'instagram') {
+      actorId = "presetshubham~instagram-reel-downloader";
+      payload = {
+        reelLinks: [url],
+        proxy: "none"
+      };
+    } else if (platform === 'tiktok') {
+      actorId = "clockworks~free-tiktok-scraper";
+      payload = {
+        postURLs: [url],
+        resultsLimit: 1
+      };
+    } else {
+      throw new Error(`Unsupported platform: ${platform}`);
+    }
     
     // Start the actor run
-    const actorRunResponse = await fetch("https://api.apify.com/v2/acts/presetshubham~instagram-reel-downloader/runs", {
+    const actorRunResponse = await fetch(`https://api.apify.com/v2/acts/${actorId}/runs`, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        reelLinks: [instagramUrl],
-        proxy: "none"
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!actorRunResponse.ok) {
@@ -172,11 +188,20 @@ async function scrapeWithApify(instagramUrl: string): Promise<{ caption?: string
         
         if (results && results.length > 0) {
           const result = results[0];
-          return {
-            caption: result.caption || result.description || null,
-            author: result.owner || result.username || null,
-            thumbnailUrl: result.thumbnail || result.cover || null
-          };
+          
+          if (platform === 'instagram') {
+            return {
+              caption: result.caption || result.description || null,
+              author: result.owner_username || result.owner || result.username || null,
+              thumbnailUrl: result.thumbnail || result.cover || null
+            };
+          } else if (platform === 'tiktok') {
+            return {
+              caption: result.text || result.description || result.caption || null,
+              author: result.authorMeta?.name || result.author?.uniqueId || result.username || null,
+              thumbnailUrl: result.covers?.[0] || result.thumbnail || result.cover || null
+            };
+          }
         }
         
         return {};
@@ -322,13 +347,13 @@ serve(async (req) => {
       global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
     });
 
-    // Instagram scraping with Apify
+    // Social media scraping with Apify
     let apifyData: { caption?: string; author?: string; thumbnailUrl?: string; } | null = null;
 
     if (platform === "instagram") {
       try {
         console.log("Attempting Instagram scraping with Apify...");
-        apifyData = await scrapeWithApify(videoUrl);
+        apifyData = await scrapeWithApify(videoUrl, 'instagram');
         console.log("Apify scraping successful:", apifyData);
       } catch (e) {
         console.warn("Apify Instagram scraping failed. Error details:", e);
@@ -343,19 +368,37 @@ serve(async (req) => {
           console.log("Created fallback Instagram info from URL structure:", apifyData);
         }
       }
+    } else if (platform === "tiktok") {
+      try {
+        console.log("Attempting TikTok scraping with Apify...");
+        apifyData = await scrapeWithApify(videoUrl, 'tiktok');
+        console.log("Apify scraping successful:", apifyData);
+      } catch (e) {
+        console.warn("Apify TikTok scraping failed. Error details:", e);
+        // Create fallback info for TikTok when scraping fails
+        const urlInfo = extractTikTokInfo(videoUrl);
+        if (urlInfo) {
+          apifyData = {
+            caption: `TikTok Recipe from ${urlInfo.username || 'TikTok User'}`,
+            author: urlInfo.username || 'TikTok User',
+            thumbnailUrl: null
+          };
+          console.log("Created fallback TikTok info from URL structure:", apifyData);
+        }
+      }
     } else {
-      // For non-Instagram platforms, we'll handle them separately or throw error
-      if (platform === "tiktok" || platform === "youtube") {
-        throw new Error(`${platform} is not supported yet. Please use Instagram reels.`);
+      // For other platforms
+      if (platform === "youtube") {
+        throw new Error(`${platform} is not supported yet. Please use Instagram reels or TikTok videos.`);
       } else {
-        throw new Error("Unsupported platform. Please use Instagram reels.");
+        throw new Error("Unsupported platform. Please use Instagram reels or TikTok videos.");
       }
     }
 
-    // Analysis & insert for Instagram only
-    if (platform === "instagram" && apifyData) {
+    // Analysis & insert for Instagram and TikTok
+    if ((platform === "instagram" || platform === "tiktok") && apifyData) {
       // Build content for AI analysis
-      const content = `Instagram Caption: ${apifyData.caption || ""}
+      const content = `${platform === 'instagram' ? 'Instagram' : 'TikTok'} Caption: ${apifyData.caption || ""}
 Author: ${apifyData.author || ""}`;
       
       const prompt = buildPrompt(videoUrl, platform, content, undefined);
@@ -398,10 +441,10 @@ Author: ${apifyData.author || ""}`;
     }
 
     // If we have fallback data but no proper scraping
-    if (platform === "instagram" && apifyData && apifyData.caption && apifyData.caption.includes("Manual Review Needed")) {
+    if ((platform === "instagram" || platform === "tiktok") && apifyData && apifyData.caption && (apifyData.caption.includes("Instagram Recipe from") || apifyData.caption.includes("TikTok Recipe from"))) {
       const insertPayload = {
         user_id: userId,
-        title: "Recipe from Instagram Video - Manual Review Needed",
+        title: `Recipe from ${platform === 'instagram' ? 'Instagram' : 'TikTok'} Video - Manual Review Needed`,
         description: apifyData.caption || null,
         ingredients: [] as string[],
         instructions: [] as string[],
@@ -436,7 +479,7 @@ Author: ${apifyData.author || ""}`;
 
     // Nothing worked
     return new Response(
-      JSON.stringify({ success: false, error: "Instagram parsing failed. Please ensure the post is public or try again later." } satisfies ExtractResponse),
+      JSON.stringify({ success: false, error: `${platform === 'instagram' ? 'Instagram' : 'TikTok'} parsing failed. Please ensure the post is public or try again later.` } satisfies ExtractResponse),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: any) {
