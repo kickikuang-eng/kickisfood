@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Search, Clock, Users, ChefHat, ChevronsUpDown, Trash2 } from "lucide-react";
+import { Plus, Search, Clock, Users, ChefHat, ChevronsUpDown, Trash2, RefreshCw } from "lucide-react";
 import { AddRecipeDialog } from "@/components/AddRecipeDialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -213,12 +213,22 @@ const filteredRecipes = recipes.filter((recipe) => {
               {recipes.length} {lang === 'sv' ? 'recept' : 'recipe'}{recipes.length !== 1 ? (lang === 'sv' ? 'er' : 's') : ''} {lang === 'sv' ? 'sparade' : 'saved'}
             </p>
           </div>
-          <AddRecipeDialog>
-            <Button className="bg-emerald-600 hover:bg-emerald-700">
-              <Plus className="w-4 h-4 mr-2" />
-              {lang === 'sv' ? 'Lägg till recept' : 'Add Recipe'}
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={fetchRecipes}
+              disabled={isLoading}
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              {lang === 'sv' ? 'Uppdatera' : 'Refresh'}
             </Button>
-          </AddRecipeDialog>
+            <AddRecipeDialog>
+              <Button className="bg-emerald-600 hover:bg-emerald-700">
+                <Plus className="w-4 h-4 mr-2" />
+                {lang === 'sv' ? 'Lägg till recept' : 'Add Recipe'}
+              </Button>
+            </AddRecipeDialog>
+          </div>
         </div>
 
 {/* Search + Filters */}
