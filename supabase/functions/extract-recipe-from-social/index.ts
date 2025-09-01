@@ -119,13 +119,10 @@ async function scrapeWithApify(url: string, platform: 'instagram' | 'tiktok'): P
     let payload: any;
     
     if (platform === 'instagram') {
-      actorId = "apify~instagram-post-scraper";
+      actorId = "presetshubham~instagram-reel-downloader";
       payload = {
-        directUrls: [url],
-        resultsType: "posts",
-        resultsLimit: 1,
-        searchType: "hashtag",
-        searchLimit: 1
+        reelLinks: [url],
+        proxy: "none"
       };
     } else if (platform === 'tiktok') {
       actorId = "clockworks~free-tiktok-scraper";
