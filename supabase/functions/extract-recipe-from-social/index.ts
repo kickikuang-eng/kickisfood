@@ -190,10 +190,14 @@ async function scrapeWithApify(url: string, platform: 'instagram' | 'tiktok'): P
           const result = results[0];
           
           if (platform === 'instagram') {
+            // Log the full result to see what fields are available
+            console.log("Instagram Apify result fields:", Object.keys(result));
+            console.log("Instagram Apify result:", JSON.stringify(result, null, 2));
+            
             return {
-              caption: result.caption || result.description || null,
-              author: result.owner_username || result.owner || result.username || null,
-              thumbnailUrl: result.thumbnail || result.cover || null
+              caption: result.caption || result.description || result.text || null,
+              author: result.owner_username || result.owner || result.username || result.author || null,
+              thumbnailUrl: result.thumbnail || result.cover || result.display_url || result.image_url || result.url || result.media_url || null
             };
           } else if (platform === 'tiktok') {
             return {
