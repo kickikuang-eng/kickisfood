@@ -223,6 +223,31 @@ async function scrapeWithApify(url: string, platform: 'instagram' | 'tiktok'): P
   }
 }
 
+async function tryInstagramOEmbed(url: string): Promise<{ caption?: string; author?: string; thumbnailUrl?: string; }> {
+  try {
+    console.log("Trying Instagram oEmbed API for:", url);
+    
+    const oembedUrl = `https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(url)}&access_token=${Deno.env.get("FACEBOOK_APP_ID")}|${Deno.env.get("FACEBOOK_APP_SECRET")}`;
+    
+    const response = await fetch(oembedUrl);
+    if (!response.ok) {
+      throw new Error(`Instagram oEmbed failed: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log("Instagram oEmbed data:", data);
+    
+    return {
+      caption: data.title || null,
+      author: data.author_name || null,
+      thumbnailUrl: data.thumbnail_url || null
+    };
+  } catch (error) {
+    console.error("Instagram oEmbed error:", error);
+    throw error;
+  }
+}
+
 function buildPrompt(sourceUrl: string, platform: string, scrapedMarkdown?: string, scrapedHtml?: string) {
   const platformSpecific = platform === "instagram" 
     ? "For Instagram content, focus on the caption text and any visible ingredients or cooking steps. Instagram often has detailed captions with recipe information."
@@ -359,17 +384,40 @@ serve(async (req) => {
         console.log("Attempting Instagram scraping with Apify...");
         apifyData = await scrapeWithApify(videoUrl, 'instagram');
         console.log("Apify scraping successful:", apifyData);
+        
+        // If Apify didn't return a thumbnail, try Instagram oEmbed as fallback
+        if (!apifyData.thumbnailUrl) {
+          console.log("No thumbnail from Apify, trying Instagram oEmbed...");
+          try {
+            const oembedData = await tryInstagramOEmbed(videoUrl);
+            apifyData = {
+              ...apifyData,
+              thumbnailUrl: oembedData.thumbnailUrl || apifyData.thumbnailUrl,
+              caption: apifyData.caption || oembedData.caption,
+              author: apifyData.author || oembedData.author
+            };
+            console.log("Enhanced data with oEmbed:", apifyData);
+          } catch (oembedError) {
+            console.warn("Instagram oEmbed also failed:", oembedError);
+          }
+        }
       } catch (e) {
-        console.warn("Apify Instagram scraping failed. Error details:", e);
-        // Create fallback info for Instagram when scraping fails
-        const urlInfo = extractInstagramInfo(videoUrl);
-        if (urlInfo) {
-          apifyData = {
-            caption: `Instagram Recipe from ${urlInfo.username || 'Instagram User'}`,
-            author: urlInfo.username || 'Instagram User',
-            thumbnailUrl: null
-          };
-          console.log("Created fallback Instagram info from URL structure:", apifyData);
+        console.warn("Apify Instagram scraping failed. Trying Instagram oEmbed fallback...", e);
+        try {
+          apifyData = await tryInstagramOEmbed(videoUrl);
+          console.log("Instagram oEmbed fallback successful:", apifyData);
+        } catch (oembedError) {
+          console.warn("Instagram oEmbed fallback also failed:", oembedError);
+          // Create fallback info for Instagram when both scraping methods fail
+          const urlInfo = extractInstagramInfo(videoUrl);
+          if (urlInfo) {
+            apifyData = {
+              caption: `Instagram Recipe from ${urlInfo.username || 'Instagram User'}`,
+              author: urlInfo.username || 'Instagram User',
+              thumbnailUrl: null
+            };
+            console.log("Created fallback Instagram info from URL structure:", apifyData);
+          }
         }
       }
     } else if (platform === "tiktok") {
