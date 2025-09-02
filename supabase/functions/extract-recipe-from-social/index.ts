@@ -120,8 +120,10 @@ async function scrapeWithApify(url: string, platform: 'instagram' | 'tiktok'): P
     
     if (platform === 'instagram') {
       actorId = "presetshubham~instagram-reel-downloader";
+      const instagramInfo = extractInstagramInfo(url);
       payload = {
         reelLinks: [url],
+        username: instagramInfo?.username || "unknown",
         proxy: "none"
       };
     } else if (platform === 'tiktok') {
