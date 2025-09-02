@@ -228,10 +228,20 @@ async function scrapeWithApify(url: string, platform: 'instagram' | 'tiktok'): P
             console.log("Instagram Apify result fields:", Object.keys(result));
             console.log("Instagram Apify result:", JSON.stringify(result, null, 2));
             
+            // Different field names for different scrapers
+            let thumbnailUrl = null;
+            if (actorId === "apify/instagram-scraper") {
+              // Image scraper fields
+              thumbnailUrl = result.displayUrl || result.images?.[0] || result.imageUrl || result.url || null;
+            } else {
+              // Video scraper fields  
+              thumbnailUrl = result.thumbnail || result.cover || result.display_url || result.image_url || result.url || result.media_url || null;
+            }
+            
             return {
               caption: result.caption || result.description || result.text || null,
-              author: result.owner_username || result.owner || result.username || result.author || null,
-              thumbnailUrl: result.thumbnail || result.cover || result.display_url || result.image_url || result.url || result.media_url || null
+              author: result.owner_username || result.owner || result.username || result.author || result.ownerUsername || null,
+              thumbnailUrl
             };
           } else if (platform === 'tiktok') {
             return {
