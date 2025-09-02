@@ -36,13 +36,23 @@ function extractInstagramInfo(url: string): { username: string | null; postId: s
     const path = u.pathname;
     const segments = path.split("/").filter(Boolean);
     
+    // Handle different Instagram URL patterns
     if (segments.length >= 2) {
-      const username = segments[0];
-      const postType = segments[1]; // 'reel' or 'p'
-      const postId = segments[2] || null;
+      // Pattern: /p/{postId} or /reel/{postId}
+      if (segments[0] === 'p' || segments[0] === 'reel') {
+        const postId = segments[1];
+        return { username: null, postId };
+      }
       
-      if (username && (postType === 'reel' || postType === 'p')) {
-        return { username, postId };
+      // Pattern: /{username}/p/{postId} or /{username}/reel/{postId}
+      if (segments.length >= 3) {
+        const username = segments[0];
+        const postType = segments[1];
+        const postId = segments[2];
+        
+        if ((postType === 'p' || postType === 'reel') && username && !['p', 'reel'].includes(username)) {
+          return { username, postId };
+        }
       }
     }
     
@@ -122,6 +132,13 @@ async function scrapeWithApify(url: string, platform: 'instagram' | 'tiktok'): P
       const instagramInfo = extractInstagramInfo(url);
       const isVideoContent = url.includes('/reel/') || url.includes('/tv/');
       
+      console.log("Instagram URL analysis:", { 
+        url, 
+        instagramInfo, 
+        isVideoContent,
+        segments: url.split('/').filter(Boolean)
+      });
+      
       if (isVideoContent) {
         // Use video scraper for reels/videos
         actorId = "presetshubham~instagram-reel-downloader";
@@ -130,6 +147,7 @@ async function scrapeWithApify(url: string, platform: 'instagram' | 'tiktok'): P
           username: instagramInfo?.username || "unknown",
           proxy: "none"
         };
+        console.log("Using video scraper with payload:", payload);
       } else {
         // Use image scraper for posts
         actorId = "apify/instagram-scraper";
@@ -138,6 +156,7 @@ async function scrapeWithApify(url: string, platform: 'instagram' | 'tiktok'): P
           resultsLimit: 1,
           addParentData: false
         };
+        console.log("Using image scraper with payload:", payload);
       }
     } else if (platform === 'tiktok') {
       actorId = "clockworks~free-tiktok-scraper";
@@ -375,7 +394,7 @@ serve(async (req) => {
         apifyData = await scrapeWithApify(videoUrl, 'instagram');
         console.log("Apify scraping successful:", apifyData);
       } catch (e) {
-        console.warn("Apify Instagram scraping failed. Error details:", e);
+        console.error("Apify Instagram scraping failed. Error details:", e);
         // Create fallback info for Instagram when scraping fails
         const urlInfo = extractInstagramInfo(videoUrl);
         if (urlInfo) {
@@ -385,6 +404,8 @@ serve(async (req) => {
             thumbnailUrl: null
           };
           console.log("Created fallback Instagram info from URL structure:", apifyData);
+        } else {
+          throw new Error(`Instagram parsing failed. Please ensure the post is public or try again later. Error: ${e.message}`);
         }
       }
     } else if (platform === "tiktok") {
