@@ -119,13 +119,26 @@ async function scrapeWithApify(url: string, platform: 'instagram' | 'tiktok'): P
     let payload: any;
     
     if (platform === 'instagram') {
-      actorId = "presetshubham~instagram-reel-downloader";
       const instagramInfo = extractInstagramInfo(url);
-      payload = {
-        reelLinks: [url],
-        username: instagramInfo?.username || "unknown",
-        proxy: "none"
-      };
+      const isVideoContent = url.includes('/reel/') || url.includes('/tv/');
+      
+      if (isVideoContent) {
+        // Use video scraper for reels/videos
+        actorId = "presetshubham~instagram-reel-downloader";
+        payload = {
+          reelLinks: [url],
+          username: instagramInfo?.username || "unknown",
+          proxy: "none"
+        };
+      } else {
+        // Use image scraper for posts
+        actorId = "apify/instagram-scraper";
+        payload = {
+          directUrls: [url],
+          resultsLimit: 1,
+          addParentData: false
+        };
+      }
     } else if (platform === 'tiktok') {
       actorId = "clockworks~free-tiktok-scraper";
       payload = {
