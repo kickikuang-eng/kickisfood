@@ -24,8 +24,33 @@ function extractPlatform(url: string): "youtube" | "tiktok" | "instagram" | "unk
 function parseOgImageFromHtml(html?: string | null): string | null {
   if (!html) return null;
   const match = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["'][^>]*>/i)
-    || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["'][^>]*>/i);
+    || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["'][^>]*>/i)
+    || html.match(/<meta[^>]+property=["']og:image:secure_url["'][^>]+content=["']([^"']+)["'][^>]*>/i);
   return match ? match[1] : null;
+}
+
+function parseOgContentFromHtml(html?: string | null, property?: string): string | null {
+  if (!html || !property) return null;
+  const re1 = new RegExp(`<meta[^>]+property=["']${property}["'][^>]+content=["']([^"']+)["'][^>]*>`, 'i');
+  const re2 = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${property}["'][^>]*>`, 'i');
+  const m = html.match(re1) || html.match(re2);
+  return m ? m[1] : null;
+}
+
+async function fetchPublicHtml(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        // Use a common desktop UA to increase chances of receiving OG tags
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+    if (!res.ok) return null;
+    return await res.text();
+  } catch {
+    return null;
+  }
 }
 
 function extractInstagramInfo(url: string): { username: string | null; postId: string | null } | null {
@@ -350,6 +375,8 @@ serve(async (req) => {
     // Social media scraping with Apify
     let apifyData: { caption?: string; author?: string; thumbnailUrl?: string; } | null = null;
 
+    let fallbackHtml: string | null = null;
+
     if (platform === "instagram") {
       try {
         console.log("Attempting Instagram scraping with Apify...");
@@ -395,13 +422,34 @@ serve(async (req) => {
       }
     }
 
+    // Attempt HTML fallback if scraping didn't yield data
+    if (!apifyData || (!apifyData.thumbnailUrl && !apifyData.caption)) {
+      try {
+        const html = await fetchPublicHtml(videoUrl);
+        if (html) {
+          fallbackHtml = html;
+          const ogImage = parseOgImageFromHtml(html);
+          const ogTitle = parseOgContentFromHtml(html, 'og:title') || parseOgContentFromHtml(html, 'twitter:title');
+          const ogDesc = parseOgContentFromHtml(html, 'og:description') || parseOgContentFromHtml(html, 'twitter:description');
+          const urlAuthor = extractAuthorFromUrl(videoUrl);
+          apifyData = {
+            caption: apifyData?.caption || ogDesc || ogTitle || null,
+            author: apifyData?.author || urlAuthor || null,
+            thumbnailUrl: apifyData?.thumbnailUrl || ogImage || null,
+          };
+        }
+      } catch (e) {
+        console.warn('HTML fallback fetch failed', e);
+      }
+    }
+
     // Analysis & insert for Instagram and TikTok
     if ((platform === "instagram" || platform === "tiktok") && apifyData) {
       // Build content for AI analysis
       const content = `${platform === 'instagram' ? 'Instagram' : 'TikTok'} Caption: ${apifyData.caption || ""}
 Author: ${apifyData.author || ""}`;
       
-      const prompt = buildPrompt(videoUrl, platform, content, undefined);
+      const prompt = buildPrompt(videoUrl, platform, content, fallbackHtml || undefined);
       const raw = await analyzeWithGemini(prompt);
       const normalized = normalizeRecipe(raw, apifyData.thumbnailUrl, apifyData.author);
 
