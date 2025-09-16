@@ -36,23 +36,13 @@ function extractInstagramInfo(url: string): { username: string | null; postId: s
     const path = u.pathname;
     const segments = path.split("/").filter(Boolean);
     
-    // Handle different Instagram URL patterns
     if (segments.length >= 2) {
-      // Pattern: /p/{postId} or /reel/{postId}
-      if (segments[0] === 'p' || segments[0] === 'reel') {
-        const postId = segments[1];
-        return { username: null, postId };
-      }
+      const username = segments[0];
+      const postType = segments[1]; // 'reel' or 'p'
+      const postId = segments[2] || null;
       
-      // Pattern: /{username}/p/{postId} or /{username}/reel/{postId}
-      if (segments.length >= 3) {
-        const username = segments[0];
-        const postType = segments[1];
-        const postId = segments[2];
-        
-        if ((postType === 'p' || postType === 'reel') && username && !['p', 'reel'].includes(username)) {
-          return { username, postId };
-        }
+      if (username && (postType === 'reel' || postType === 'p')) {
+        return { username, postId };
       }
     }
     
@@ -129,35 +119,11 @@ async function scrapeWithApify(url: string, platform: 'instagram' | 'tiktok'): P
     let payload: any;
     
     if (platform === 'instagram') {
-      const instagramInfo = extractInstagramInfo(url);
-      const isVideoContent = url.includes('/reel/') || url.includes('/tv/');
-      
-      console.log("Instagram URL analysis:", { 
-        url, 
-        instagramInfo, 
-        isVideoContent,
-        segments: url.split('/').filter(Boolean)
-      });
-      
-      if (isVideoContent) {
-        // Use video scraper for reels/videos
-        actorId = "presetshubham~instagram-reel-downloader";
-        payload = {
-          reelLinks: [url],
-          username: instagramInfo?.username || "unknown",
-          proxy: "none"
-        };
-        console.log("Using video scraper with payload:", payload);
-      } else {
-        // Use image scraper for posts
-        actorId = "apify/instagram-scraper";
-        payload = {
-          directUrls: [url],
-          resultsLimit: 1,
-          addParentData: false
-        };
-        console.log("Using image scraper with payload:", payload);
-      }
+      actorId = "presetshubham~instagram-reel-downloader";
+      payload = {
+        reelLinks: [url],
+        proxy: "none"
+      };
     } else if (platform === 'tiktok') {
       actorId = "clockworks~free-tiktok-scraper";
       payload = {
@@ -224,24 +190,10 @@ async function scrapeWithApify(url: string, platform: 'instagram' | 'tiktok'): P
           const result = results[0];
           
           if (platform === 'instagram') {
-            // Log the full result to see what fields are available
-            console.log("Instagram Apify result fields:", Object.keys(result));
-            console.log("Instagram Apify result:", JSON.stringify(result, null, 2));
-            
-            // Different field names for different scrapers
-            let thumbnailUrl = null;
-            if (actorId === "apify/instagram-scraper") {
-              // Image scraper fields
-              thumbnailUrl = result.displayUrl || result.images?.[0] || result.imageUrl || result.url || null;
-            } else {
-              // Video scraper fields  
-              thumbnailUrl = result.thumbnail || result.cover || result.display_url || result.image_url || result.url || result.media_url || null;
-            }
-            
             return {
-              caption: result.caption || result.description || result.text || null,
-              author: result.owner_username || result.owner || result.username || result.author || result.ownerUsername || null,
-              thumbnailUrl
+              caption: result.caption || result.description || null,
+              author: result.owner_username || result.owner || result.username || null,
+              thumbnailUrl: result.thumbnail || result.cover || null
             };
           } else if (platform === 'tiktok') {
             return {
@@ -404,7 +356,7 @@ serve(async (req) => {
         apifyData = await scrapeWithApify(videoUrl, 'instagram');
         console.log("Apify scraping successful:", apifyData);
       } catch (e) {
-        console.error("Apify Instagram scraping failed. Error details:", e);
+        console.warn("Apify Instagram scraping failed. Error details:", e);
         // Create fallback info for Instagram when scraping fails
         const urlInfo = extractInstagramInfo(videoUrl);
         if (urlInfo) {
@@ -414,8 +366,6 @@ serve(async (req) => {
             thumbnailUrl: null
           };
           console.log("Created fallback Instagram info from URL structure:", apifyData);
-        } else {
-          throw new Error(`Instagram parsing failed. Please ensure the post is public or try again later. Error: ${e.message}`);
         }
       }
     } else if (platform === "tiktok") {
